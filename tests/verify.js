@@ -1134,6 +1134,10 @@ ok('觀戰者只能填格子留言與聊天：沒有數字盤、沒有遊戲提�
   assert.ok(watchHtml.indexOf('b-note') < 0, '觀戰畫面不可以有筆記按鈕');
   assert.ok(watchHtml.indexOf('b-watch-note') >= 0, '觀戰畫面要有共享留言送出入口');
   assert.ok(/cell-note-corner/.test(appSource), '每個格子要有右上角格子留言三角形');
+  assert.ok(/selectWatchCell\(parseInt\(target\.getAttribute\('data-i'\), 10\), true, true\)/.test(appSource),
+    '觀戰者點整個格子要和點留言三角形一樣展開留言');
+  assert.ok(/selectCell\(parseInt\(target\.getAttribute\('data-i'\), 10\), true\)/.test(appSource),
+    '玩家點整個格子要維持原本的數獨選格操作');
   /* 觀戰盤面的格子是 div，不是可以按的 button */
   assert.ok(/watchCells\.push\(cell\)/.test(appSource) && /D\.createElement\('div'\)/.test(appSource),
     '觀戰盤面的格子要用 div，不可以做成可點的按鈕');
@@ -1144,6 +1148,9 @@ ok('聊天室錨定左下角，操作 Summary 在寬版右半邊，都不會蓋�
   assert.ok(/\.chat-fab\{[^}]*left:/.test(css) && /\.chat-fab\{[^}]*bottom:/.test(css), '留言入口要在左下角');
   assert.ok(/\.chat-panel\{[^}]*left:/.test(css), '留言面板要錨定左邊');
   assert.ok(/\.chat-fab\{[^}]*env\(safe-area-inset-left\)/.test(css), '留言入口要在安全區內');
+  assert.ok(/\.chat-fab\.chat-fab-hidden\{display:none\}/.test(css), '留言面板展開時浮動入口不能覆蓋面板');
+  assert.ok(/chat-fab-hidden/.test(appSource) && /q\('chat-close'\)\.focus\(\)/.test(appSource),
+    '留言面板展開時要隱藏浮動入口並把焦點移到關閉鈕');
   /* z-index：設定按鈕 70、設定彈窗 100 都要高於留言板 */
   const zOf = (sel) => {
     const m = new RegExp('\\' + sel + '\\{[^}]*z-index:(\\d+)').exec(css);

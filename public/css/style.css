@@ -504,6 +504,7 @@ body{
   bottom:calc(12px + env(safe-area-inset-bottom));
   --d:6px;min-width:56px;min-height:56px;
 }
+.chat-fab.chat-fab-hidden{display:none}
 .chat-fab .b3-lbl{font-size:1.35rem}
 .chat-badge{
   position:absolute;top:-11px;right:-13px;min-width:24px;height:24px;padding:0 5px;

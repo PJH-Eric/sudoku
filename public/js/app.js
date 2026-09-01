@@ -1062,7 +1062,7 @@
       }
       var target = e.target.closest ? e.target.closest('.cell') : null;
       if (!target) return;
-      selectWatchCell(parseInt(target.getAttribute('data-i'), 10), true, false);
+      selectWatchCell(parseInt(target.getAttribute('data-i'), 10), true, true);
     });
   }
 
@@ -1468,6 +1468,8 @@
       q('chat-panel').classList.remove('open');
       q('chat-panel').setAttribute('aria-hidden', 'true');
       q('chat-backdrop').hidden = true;
+      fab.classList.remove('chat-fab-hidden');
+      fab.tabIndex = 0;
       chatOpen = false;
     }
     setTimeout(function () { if (on) w.UI.paint(fab); }, 0);
@@ -1476,18 +1478,22 @@
   function setChatOpen(on) {
     var panel = q('chat-panel');
     var fab = q('b-chat');
+    var wasOpen = chatOpen;
     chatOpen = !!on && !fab.hidden;
     panel.classList.toggle('open', chatOpen);
     panel.setAttribute('aria-hidden', chatOpen ? 'false' : 'true');
     fab.setAttribute('aria-expanded', chatOpen ? 'true' : 'false');
+    fab.classList.toggle('chat-fab-hidden', chatOpen);
+    fab.tabIndex = chatOpen ? -1 : 0;
     /* 遮罩只在窄版出現（CSS 決定是否顯示成整片），寬版點外面也不會誤關 */
     q('chat-backdrop').hidden = !chatOpen || w.innerWidth > 560;
     if (chatOpen) {
       chatUnread = 0;
       updateChatBadge();
-      chatLastFocus = D.activeElement;
+      if (!wasOpen) chatLastFocus = fab;
       var log = q('chat-log');
       log.scrollTop = log.scrollHeight;
+      q('chat-close').focus();
       setTimeout(function () { w.UI.repaintAll(panel); }, 20);
     } else if (chatLastFocus && chatLastFocus.focus) {
       try { chatLastFocus.focus(); } catch (e) {}

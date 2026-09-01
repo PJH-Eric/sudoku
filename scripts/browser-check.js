@@ -363,11 +363,16 @@ async function main() {
     const noteChrome = JSON.parse(await cdp.eval(
       "var corner=document.querySelector('#board .cell .cell-note-corner');" +
       "if(corner) corner.click();" +
+      "var triangleOpen=!!corner && !corner.parentNode.querySelector('.cell-note-popover').hidden;" +
+      "var playerCell=document.querySelector('#board .cell[data-i=\"1\"]');" +
+      "if(playerCell) playerCell.click();" +
+      "var playerPopover=playerCell && playerCell.querySelector('.cell-note-popover');" +
       "var cs=corner ? getComputedStyle(corner) : null;" +
       "return JSON.stringify({corners:document.querySelectorAll('#board .cell .cell-note-corner').length," +
       "size:cs ? Math.max(parseFloat(cs.width),parseFloat(cs.height)) : 0," +
-      "open:!!corner && !corner.parentNode.querySelector('.cell-note-popover').hidden});"
+      "open:triangleOpen,playerClickOpens:!!playerPopover && !playerPopover.hidden});"
     ));
+    check('玩家點整格不會展開格子留言', noteChrome.playerClickOpens === false, JSON.stringify(noteChrome));
     check('每格都有右上角小型格子留言三角形且可展開', noteChrome.corners === 81 && noteChrome.size <= 18 && noteChrome.open, JSON.stringify(noteChrome));
     await shot(v.name + '-5-遊戲中');
 
@@ -702,11 +707,21 @@ async function main() {
   ));
   check('觀戰者畫面每格都有格子留言三角形，且沒有數字盤／遊戲提示',
     watchUi.ready && watchUi.corners === 81 && watchUi.input === 10 && !watchUi.numpad && !watchUi.hint && watchUi.cellTag === 'DIV', JSON.stringify(watchUi));
+  const chatLayout = JSON.parse(await cdp.eval(
+    "var chatFab=document.getElementById('b-chat'); chatFab.focus(); chatFab.click();" +
+    "var chatPanel=document.getElementById('chat-panel');" +
+    "return JSON.stringify({open:chatPanel.classList.contains('open'),fabDisplay:getComputedStyle(chatFab).display," +
+    "focus:document.activeElement.id});"
+  ));
+  check('聊天室展開時不會覆蓋輸入按鈕', chatLayout.open && chatLayout.fabDisplay === 'none' && chatLayout.focus === 'chat-close', JSON.stringify(chatLayout));
+  const chatClosedFocus = await cdp.eval("var chatClose=document.getElementById('chat-close'); chatClose.focus(); chatClose.click(); return document.activeElement.id;");
+  check('聊天室關閉後焦點回到聊天入口', chatClosedFocus === 'b-chat', chatClosedFocus);
   const noteUi = JSON.parse(await cdp.eval(
     "var c=document.querySelector('#watch-board .cell[data-i=\"80\"]'); c.click();" +
     "var i=document.getElementById('watch-note-input'); i.value='可能是7';" +
     "document.getElementById('watch-note-form').requestSubmit();" +
-    "return JSON.stringify({selected:c.classList.contains('watch-sel'),cell:c.getAttribute('data-i'),value:i.value});"
+    "return JSON.stringify({selected:c.classList.contains('watch-sel'),cell:c.getAttribute('data-i'),value:i.value," +
+    "open:!c.querySelector('.cell-note-popover').hidden});"
   ));
   const noteAppeared = await waitForPage("document.querySelector('#watch-board .cell[data-i=\"80\"]').classList.contains('has-shared-notes')", 5000);
   await sleep(500);
@@ -718,10 +733,12 @@ async function main() {
     "document.querySelector('#watch-board .cell[data-i=\"80\"] .cell-note-count').textContent === '2'", 5000
   );
   const popover = JSON.parse(await cdp.eval(
-    "var c=document.querySelector('#watch-board .cell[data-i=\"80\"] .cell-note-corner'); c.click();" +
-    "var p=c.parentNode.querySelector('.cell-note-popover');" +
+    "var c=document.querySelector('#watch-board .cell[data-i=\"80\"]'); c.click();" +
+    "c.querySelector('.cell-note-corner').click();" +
+    "var p=c.querySelector('.cell-note-popover');" +
     "return JSON.stringify({open:!p.hidden,text:p.textContent});"
   ));
+  check('觀戰者點格子會開啟格子留言', noteUi.selected && noteUi.cell === '80' && noteUi.open, JSON.stringify(noteUi));
   check('觀戰者可以連續新增 10 字內格子留言', noteUi.selected && noteUi.cell === '80' && noteAppeared && secondNoteAppeared,
     JSON.stringify({ ui: noteUi, appeared: noteAppeared, second: secondNoteAppeared }));
   check('點右上角三角形會顯示格子留言歷史', popover.open && popover.text.indexOf('可能是7') >= 0 && popover.text.indexOf('再看一眼') >= 0,
