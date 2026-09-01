@@ -168,13 +168,27 @@ ok('產生的完整解答一定合法', () => {
 });
 
 /* ============ 3. 難度差異與唯一解 ============ */
-section('3. 四種難度的實質差異');
+section('3. 五種難度的實質差異（量化門檻）');
 
-const SEEDS = ['AAA111', 'BCD234', 'KRT789', 'MNP456', 'QWE321', 'ZXC987'];
+/* 難度不是「有沒有用到某技巧」而已，而是整條解題路徑的形狀。
+ * 這裡每個難度跑 24 個種子，逐題用 Sudoku.analyze() 的量化指標檢查：
+ *   提示數區間互不重疊、需要的技巧層級、卡點次數與分散度、卡點出現得夠早。 */
+const SEEDS = [];
+for (let i = 0; i < 24; i++) SEEDS.push('V' + i);
 const generated = {};
 
 S.DIFFICULTIES.forEach((difficulty) => {
   generated[difficulty] = SEEDS.map((seed) => S.generatePuzzle({ difficulty, seed }));
+});
+const profiles = {};
+S.DIFFICULTIES.forEach((difficulty) => {
+  profiles[difficulty] = generated[difficulty].map((p) => S.analyze(p.puzzle));
+});
+
+ok('五種難度都存在，而且順序由易到難', () => {
+  assert.strictEqual(S.DIFFICULTIES.join(','), 'beginner,easy,medium,hard,expert');
+  S.DIFFICULTIES.forEach((d) => assert.ok(S.PRESETS[d], `缺少難度設定：${d}`));
+  assert.strictEqual(S.PRESETS.beginner.label, '新手入門');
 });
 
 ok('每一題都只有一組答案', () => {
@@ -203,58 +217,130 @@ ok('同一個種子＋同一個難度永遠得到同一題', () => {
   assert.notDeepStrictEqual(other.puzzle, generated.easy[0].puzzle, '不同種子應該是不同題目');
 });
 
-ok('挖空數量隨難度遞增', () => {
-  const avg = {};
-  S.DIFFICULTIES.forEach((difficulty) => {
+ok('五個提示數區間互不重疊，而且題目確實落在自己的區間裡', () => {
+  const order = S.DIFFICULTIES;
+  for (let i = 0; i + 1 < order.length; i++) {
+    const easier = S.PRESETS[order[i]];
+    const harder = S.PRESETS[order[i + 1]];
+    assert.ok(
+      harder.givensMax < easier.givensMin,
+      `${easier.label}(${easier.givensMin}–${easier.givensMax}) 與 ${harder.label}(${harder.givensMin}–${harder.givensMax}) 的提示數區間不可以重疊`
+    );
+  }
+  order.forEach((difficulty) => {
     const preset = S.PRESETS[difficulty];
-    let sum = 0;
     generated[difficulty].forEach((p, i) => {
       assert.ok(
-        p.givens <= preset.targetGivens && p.givens >= preset.minGivens,
-        `${difficulty} 第 ${i + 1} 題的提示數 ${p.givens} 不在 ${preset.minGivens}~${preset.targetGivens} 之間`
+        p.givens >= preset.givensMin && p.givens <= preset.givensMax,
+        `${difficulty} 第 ${i + 1} 題的提示數 ${p.givens} 不在 ${preset.givensMin}~${preset.givensMax} 之間`
       );
-      sum += p.givens;
     });
-    avg[difficulty] = sum / SEEDS.length;
   });
-  assert.ok(avg.easy > avg.medium, `簡單(${avg.easy}) 的提示數要多於普通(${avg.medium})`);
-  assert.ok(avg.medium > avg.hard, `普通(${avg.medium}) 的提示數要多於困難(${avg.hard})`);
-  assert.ok(avg.hard > avg.expert, `困難(${avg.hard}) 的提示數要多於專家(${avg.expert})`);
 });
 
-ok('每個難度需要的解題技巧確實不同', () => {
-  generated.easy.forEach((p, i) => {
-    assert.strictEqual(
-      S.humanSolve(p.puzzle, S.TIER.SINGLE).solved, true,
-      `簡單第 ${i + 1} 題應該只靠「唯一候選數」就能解完`
-    );
+ok('提示數平均值隨難度嚴格遞減', () => {
+  const avg = {};
+  S.DIFFICULTIES.forEach((d) => {
+    avg[d] = generated[d].reduce((sum, p) => sum + p.givens, 0) / SEEDS.length;
   });
-  generated.medium.forEach((p, i) => {
-    assert.strictEqual(
-      S.humanSolve(p.puzzle, S.TIER.SINGLE).solved, false,
-      `普通第 ${i + 1} 題不應該只靠「唯一候選數」就解完`
+  const order = S.DIFFICULTIES;
+  for (let i = 0; i + 1 < order.length; i++) {
+    assert.ok(
+      avg[order[i]] > avg[order[i + 1]] + 2,
+      `${order[i]}(${avg[order[i]].toFixed(1)}) 的提示數要明顯多於 ${order[i + 1]}(${avg[order[i + 1]].toFixed(1)})`
     );
-    assert.strictEqual(
-      S.humanSolve(p.puzzle, S.TIER.HIDDEN).solved, true,
-      `普通第 ${i + 1} 題應該用到「隱藏唯一數」就能解完`
-    );
+  }
+});
+
+ok('新手入門：全程只需要唯一候選數，而且過半步驟一眼就看得到', () => {
+  profiles.beginner.forEach((a, i) => {
+    assert.strictEqual(a.solved, true, `新手入門第 ${i + 1} 題應該解得完`);
+    assert.strictEqual(a.maxTier, S.TIER.SINGLE, `新手入門第 ${i + 1} 題不該用到唯一候選數以外的技巧`);
+    assert.ok(a.obviousRatio >= 0.55,
+      `新手入門第 ${i + 1} 題「一眼可見」的步驟只有 ${(a.obviousRatio * 100).toFixed(0)}%，對新手不夠友善`);
   });
-  generated.hard.forEach((p, i) => {
-    assert.strictEqual(
-      S.humanSolve(p.puzzle, S.TIER.HIDDEN).solved, false,
-      `困難第 ${i + 1} 題不應該只靠兩種「唯一數」就解完`
-    );
-    assert.strictEqual(
-      S.humanSolve(p.puzzle, S.TIER.ADVANCED).solved, true,
-      `困難第 ${i + 1} 題應該在進階技巧範圍內可解`
-    );
+  const avgObvious = profiles.beginner.reduce((s, a) => s + a.obviousRatio, 0) / profiles.beginner.length;
+  const easyObvious = profiles.easy.reduce((s, a) => s + a.obviousRatio, 0) / profiles.easy.length;
+  assert.ok(avgObvious > easyObvious,
+    `新手入門(${avgObvious.toFixed(2)}) 的「一眼可見」比例要高於簡單(${easyObvious.toFixed(2)})`);
+});
+
+ok('簡單：一樣只需要唯一候選數，但提示數明顯更少、步數更多', () => {
+  profiles.easy.forEach((a, i) => {
+    assert.strictEqual(a.solved, true, `簡單第 ${i + 1} 題應該解得完`);
+    assert.strictEqual(a.maxTier, S.TIER.SINGLE, `簡單第 ${i + 1} 題不該用到唯一候選數以外的技巧`);
   });
-  generated.expert.forEach((p, i) => {
-    assert.strictEqual(
-      S.humanSolve(p.puzzle, S.TIER.ADVANCED).solved, false,
-      `專家第 ${i + 1} 題應該連進階技巧都推不完，需要試誤`
-    );
+  const avgSteps = (list) => list.reduce((s, a) => s + a.steps, 0) / list.length;
+  assert.ok(avgSteps(profiles.easy) > avgSteps(profiles.beginner) + 5,
+    `簡單的平均步數(${avgSteps(profiles.easy).toFixed(1)}) 要明顯多於新手入門(${avgSteps(profiles.beginner).toFixed(1)})`);
+});
+
+ok('普通：至少 6 步隱藏唯一數、完全不需要第 3 級技巧，而且卡點要夠早又分散', () => {
+  profiles.medium.forEach((a, i) => {
+    assert.strictEqual(a.solved, true, `普通第 ${i + 1} 題應該解得完`);
+    assert.strictEqual(a.maxTier, S.TIER.HIDDEN, `普通第 ${i + 1} 題的最高技巧應該剛好是隱藏唯一數`);
+    assert.ok(a.byTier[S.TIER.HIDDEN] >= 6,
+      `普通第 ${i + 1} 題只用了 ${a.byTier[S.TIER.HIDDEN]} 步隱藏唯一數，跟簡單差不多`);
+    assert.strictEqual(a.byTier[S.TIER.LOCKED] + a.byTier[S.TIER.ADVANCED], 0,
+      `普通第 ${i + 1} 題不該需要區塊摒除／裸對`);
+    assert.ok(a.stalls >= 3, `普通第 ${i + 1} 題只卡住 ${a.stalls} 次，難度沒有貫穿整局`);
+    assert.ok(a.spread >= 2, `普通第 ${i + 1} 題的卡點只集中在 ${a.spread} 個區段`);
+    assert.ok(a.firstHardAt <= 0.30,
+      `普通第 ${i + 1} 題的第一個非唯一候選數步驟出現在 ${(a.firstHardAt * 100).toFixed(0)}%，太晚了`);
   });
+});
+
+ok('困難：至少 5 步第 3 級以上、要用到兩種以上的第 3 級技巧', () => {
+  profiles.hard.forEach((a, i) => {
+    assert.strictEqual(a.solved, true, `困難第 ${i + 1} 題應該在進階技巧範圍內解得完`);
+    const advanced = a.byTier[S.TIER.LOCKED] + a.byTier[S.TIER.ADVANCED];
+    assert.ok(advanced >= 3,
+      `困難第 ${i + 1} 題只有 ${advanced} 步第 3 級以上，跟普通差不多`);
+    assert.ok(a.distinct[S.TIER.LOCKED] >= 2 || advanced >= 6,
+      `困難第 ${i + 1} 題只用到 ${a.distinct[S.TIER.LOCKED]} 種第 3 級技巧、共 ${advanced} 步，變化不夠`);
+    assert.ok(a.stalls >= 3, `困難第 ${i + 1} 題只卡住 ${a.stalls} 次`);
+    assert.ok(a.spread >= 2, `困難第 ${i + 1} 題的卡點只集中在 ${a.spread} 個區段`);
+    assert.ok(a.firstHardAt <= 0.30,
+      `困難第 ${i + 1} 題的第一個卡點出現在 ${(a.firstHardAt * 100).toFixed(0)}%，太晚了`);
+    assert.strictEqual(S.humanSolve(p3(i).puzzle, S.TIER.HIDDEN).solved, false,
+      `困難第 ${i + 1} 題不該只靠兩種唯一數就解完`);
+  });
+  function p3(i) { return generated.hard[i]; }
+});
+
+ok('專家：第 3 級以上的步數再翻一倍，卡點更多，而且仍然解得出來（不是解題器放棄）', () => {
+  profiles.expert.forEach((a, i) => {
+    assert.strictEqual(a.solved, true,
+      `專家第 ${i + 1} 題必須用進階技巧就解得完，不可以定義成「解題器解不出來」`);
+    const advanced = a.byTier[S.TIER.LOCKED] + a.byTier[S.TIER.ADVANCED];
+    assert.ok(advanced >= 6, `專家第 ${i + 1} 題只有 ${advanced} 步第 3 級以上`);
+    assert.ok(a.stalls >= 3, `專家第 ${i + 1} 題只卡住 ${a.stalls} 次`);
+    assert.ok(a.spread >= 2, `專家第 ${i + 1} 題的卡點只集中在 ${a.spread} 個區段`);
+    assert.strictEqual(S.humanSolve(generated.expert[i].puzzle, S.TIER.HIDDEN).solved, false,
+      `專家第 ${i + 1} 題不該只靠兩種唯一數就解完`);
+  });
+
+  const advAvg = (list) => list.reduce((s, a) => s + a.byTier[S.TIER.LOCKED] + a.byTier[S.TIER.ADVANCED], 0) / list.length;
+  assert.ok(advAvg(profiles.expert) > advAvg(profiles.hard) + 1,
+    `專家的第 3 級以上步數(${advAvg(profiles.expert).toFixed(1)}) 要明顯多於困難(${advAvg(profiles.hard).toFixed(1)})`);
+  const stallAvg = (list) => list.reduce((s, a) => s + a.stalls, 0) / list.length;
+  assert.ok(stallAvg(profiles.expert) > stallAvg(profiles.hard),
+    `專家的卡點次數(${stallAvg(profiles.expert).toFixed(1)}) 要多於困難(${stallAvg(profiles.hard).toFixed(1)})`);
+});
+
+ok('相鄰難度的解題路徑確實不同（不是只換個名字）', () => {
+  const adv = {};
+  const t2 = {};
+  S.DIFFICULTIES.forEach((d) => {
+    adv[d] = profiles[d].reduce((s, a) => s + a.byTier[S.TIER.LOCKED] + a.byTier[S.TIER.ADVANCED], 0) / SEEDS.length;
+    t2[d] = profiles[d].reduce((s, a) => s + a.byTier[S.TIER.HIDDEN], 0) / SEEDS.length;
+  });
+  assert.strictEqual(t2.beginner, 0);
+  assert.strictEqual(t2.easy, 0);
+  assert.ok(t2.medium >= 6, `普通的隱藏唯一數平均只有 ${t2.medium.toFixed(1)} 步`);
+  assert.strictEqual(adv.medium, 0, '普通不該需要第 3 級技巧');
+  assert.ok(adv.hard >= 3, `困難的第 3 級以上平均只有 ${adv.hard.toFixed(1)} 步`);
+  assert.ok(adv.expert >= 6, `專家的第 3 級以上平均只有 ${adv.expert.toFixed(1)} 步`);
 });
 
 ok('出題速度在可接受範圍內', () => {
@@ -584,9 +670,516 @@ ok('鍵盤與觸控都能完成核心操作', () => {
   assert.ok(!/user-scalable=no/.test(html), '不應該完全禁止使用者縮放整頁');
 });
 /* ============================================================
+ * 線上觀戰房間（伺服器權威）
+ * 這一節直接 require lib/rooms.js，用注入的時鐘測寬限期與回收，不必真的等。
+ * ========================================================== */
+section('6. 線上觀戰房間與留言');
+
+const Rooms = require(path.join(root, 'lib', 'rooms.js'));
+
+/* 造一個結構合法的盤面快照：前 30 格是題目給的，其他留空 */
+function makeSnapshot(extra) {
+  let puzzle = '';
+  for (let i = 0; i < 81; i++) puzzle += i < 30 ? String((i % 9) + 1) : '0';
+  return Object.assign({
+    puzzle,
+    values: puzzle,
+    notes: [],
+    selected: 40,
+    elapsedMs: 0,
+    hintsUsed: 0,
+    mistakes: 0,
+    status: 'playing'
+  }, extra || {});
+}
+
+/* 每個測試自己建一個 store，彼此不干擾；clock 可以往前撥 */
+function makeStore(options) {
+  const clock = { t: 1700000000000 };
+  const store = Rooms.createStore(Object.assign({ now: () => clock.t }, options || {}));
+  return { store, clock, advance: (ms) => { clock.t += ms; } };
+}
+
+function openRoom(store, extra) {
+  const res = store.createRoom(Object.assign({
+    hostName: '小明', difficulty: 'medium', label: '普通', seed: 'ABC', snapshot: makeSnapshot()
+  }, extra || {}));
+  assert.ok(res.ok, '開房應該成功：' + JSON.stringify(res));
+  return res;
+}
+
+ok('開房會給房號、主持人 token 與邀請 token，房號不含容易看錯的字元', () => {
+  const { store } = makeStore();
+  const res = openRoom(store);
+  assert.strictEqual(res.code.length, Rooms.CODE_LENGTH);
+  assert.ok(/^[A-Z0-9]{4}$/.test(res.code), '房號要是 4 個大寫英數字：' + res.code);
+  assert.ok(!/[IO01]/.test(res.code), '房號不可以出現 I／O／0／1：' + res.code);
+  assert.ok(!/[IO01]/.test(Rooms.CODE_ALPHABET), '房號字母表不該包含容易看錯的字元');
+  assert.ok(res.hostToken && res.hostToken.length >= 24, '主持人 token 要夠長、不可猜測');
+  assert.ok(res.inviteToken && res.inviteToken.length >= 24, '邀請 token 要夠長、不可猜測');
+  assert.notStrictEqual(res.hostToken, res.inviteToken, '兩個 token 不可以是同一個');
+
+  const list = store.listRooms();
+  assert.strictEqual(list.length, 1);
+  assert.strictEqual(list[0].code, res.code);
+  assert.strictEqual(list[0].viewers, 0);
+  assert.strictEqual(list[0].status, 'live');
+  assert.strictEqual(list[0].total, 51, '空格數要從快照算出來');
+  assert.strictEqual(list[0].hostName, '小明');
+  assert.ok(!('hostToken' in list[0]), '房間列表不可以外洩 token');
+  assert.ok(!('inviteToken' in list[0]), '房間列表不可以外洩邀請 token');
+});
+
+ok('盤面快照會被結構驗證：格式錯、竄改題目、換題目都擋下來', () => {
+  const { store } = makeStore();
+  assert.strictEqual(store.createRoom({ snapshot: null }).ok, false, '沒有快照不能開房');
+  assert.strictEqual(store.createRoom({ snapshot: { puzzle: '123', values: '123' } }).ok, false, '長度不對要擋');
+
+  const res = openRoom(store);
+  const base = makeSnapshot();
+
+  /* 竄改題目原本就給的格子 */
+  const tampered = makeSnapshot({ values: '9' + base.values.slice(1) });
+  const bad = store.updateState(res.code, res.hostToken, tampered);
+  assert.strictEqual(bad.ok, false, '題目給的格子被改掉要擋');
+  assert.strictEqual(bad.status, 400);
+
+  /* 中途換一份完全不同的題目 */
+  const swapped = makeSnapshot();
+  swapped.puzzle = '0'.repeat(81);
+  swapped.values = '0'.repeat(81);
+  assert.strictEqual(store.updateState(res.code, res.hostToken, swapped).ok, false, '不可以中途換題目');
+
+  /* 合法更新：填一格空格 */
+  const filled = makeSnapshot({ values: base.values.slice(0, 40) + '7' + base.values.slice(41) });
+  const good = store.updateState(res.code, res.hostToken, filled);
+  assert.strictEqual(good.ok, true);
+  assert.strictEqual(good.version, 2, '版本號要單調遞增');
+  assert.strictEqual(good.state.board.filled, 1);
+
+  /* 超出範圍的數值會被夾住，不會信任用戶端 */
+  const wild = makeSnapshot({ selected: 999, elapsedMs: -5, hintsUsed: 1e9, mistakes: -3 });
+  const clamped = store.updateState(res.code, res.hostToken, wild);
+  assert.strictEqual(clamped.ok, true);
+  assert.strictEqual(clamped.state.board.selected, -1);
+  assert.strictEqual(clamped.state.board.elapsedMs, 0);
+  assert.ok(clamped.state.board.hintsUsed <= 999);
+  assert.strictEqual(clamped.state.board.mistakes, 0);
+});
+
+ok('主持人身分靠 token：別人不能改盤面、關房或換連結', () => {
+  const { store } = makeStore();
+  const res = openRoom(store);
+  const fake = 'f'.repeat(32);
+
+  const push = store.updateState(res.code, fake, makeSnapshot());
+  assert.strictEqual(push.ok, false);
+  assert.strictEqual(push.status, 403);
+
+  assert.strictEqual(store.closeRoom(res.code, fake).ok, false, '別人不能關房');
+  assert.strictEqual(store.rotateInvite(res.code, fake).ok, false, '別人不能換邀請連結');
+  assert.strictEqual(store.attachHost(res.code, fake).ok, false, '別人不能冒充主持人連線');
+
+  assert.ok(store.getRoom(res.code), '被擋下來之後房間要還在');
+  assert.strictEqual(store.attachHost(res.code, res.hostToken).ok, true, '正牌主持人可以連線');
+});
+
+ok('觀戰者加入／離開會更新人數，房間滿了會被擋下', () => {
+  const { store } = makeStore({ maxViewersPerRoom: 2 });
+  const res = openRoom(store);
+
+  const a = store.addViewer(res.code, { name: '觀眾甲' });
+  const b = store.addViewer(res.code, { name: '觀眾乙' });
+  assert.ok(a.ok && b.ok);
+  assert.notStrictEqual(a.viewerToken, b.viewerToken, '每個觀戰者的 token 要不一樣');
+  assert.strictEqual(store.getRoom(res.code).viewers.size, 2);
+
+  const c = store.addViewer(res.code, { name: '觀眾丙' });
+  assert.strictEqual(c.ok, false, '房間滿了要擋');
+  assert.strictEqual(c.status, 409);
+
+  store.removeViewer(res.code, a.viewerId);
+  assert.strictEqual(store.getRoom(res.code).viewers.size, 1, '離開就釋放名額');
+  assert.strictEqual(store.addViewer(res.code, { name: '觀眾丙' }).ok, true);
+
+  /* 名字沒填會給預設值，過長會被截斷 */
+  const { store: s2 } = makeStore();
+  const r2 = openRoom(s2);
+  assert.strictEqual(s2.addViewer(r2.code, {}).name, '路過的觀眾');
+  assert.strictEqual(s2.addViewer(r2.code, { name: '這是一個超級無敵長的暱稱應該要被截斷' }).name.length,
+    Rooms.DEFAULTS.maxNameLength);
+});
+
+ok('邀請連結：帶錯 token 會被擋，換連結之後舊的立刻失效，房號仍可直接加入', () => {
+  const { store } = makeStore();
+  const res = openRoom(store);
+
+  assert.strictEqual(store.addViewer(res.code, { invite: res.inviteToken }).ok, true, '正確的邀請 token 要放行');
+  const bad = store.addViewer(res.code, { invite: 'nope' });
+  assert.strictEqual(bad.ok, false, '錯誤的邀請 token 要擋');
+  assert.strictEqual(bad.status, 403);
+  assert.ok(/失效/.test(bad.message), '要說明是連結失效，而不是含糊的錯誤');
+
+  const rotated = store.rotateInvite(res.code, res.hostToken);
+  assert.strictEqual(rotated.ok, true);
+  assert.notStrictEqual(rotated.inviteToken, res.inviteToken, '換連結要產生新的 token');
+  assert.strictEqual(store.addViewer(res.code, { invite: res.inviteToken }).ok, false, '舊連結要立刻失效');
+  assert.strictEqual(store.addViewer(res.code, { invite: rotated.inviteToken }).ok, true, '新連結可以用');
+  assert.strictEqual(store.addViewer(res.code, {}).ok, true, '房間是公開的，用房號直接加入不需要邀請 token');
+});
+
+ok('聊天：長度上限、頻率限制、訊息淨化，而且只有房內成員能發言', () => {
+  const { store, advance } = makeStore();
+  const res = openRoom(store);
+  const viewer = store.addViewer(res.code, { name: '觀眾甲' });
+
+  /* 不在房裡的人不能發言 */
+  const stranger = store.chat(res.code, 'x'.repeat(32), '哈囉');
+  assert.strictEqual(stranger.ok, false);
+  assert.strictEqual(stranger.status, 403);
+
+  /* 空訊息 */
+  assert.strictEqual(store.chat(res.code, viewer.viewerToken, '   ').ok, false, '空白訊息不送出');
+
+  /* 淨化：控制字元、零寬字元、雙向覆寫字元都要清掉，但一般標點（含 < >）保留原樣 */
+  const dirty = 'ab' + '\u200B' + 'c' + '\u202D' + 'd \u0007<b>5 > 3</b> e';
+  const cleaned = store.chat(res.code, viewer.viewerToken, dirty);
+  assert.strictEqual(cleaned.ok, true);
+  assert.ok(cleaned.message.text.indexOf('\u0007') < 0, '控制字元要被清掉');
+  assert.ok(cleaned.message.text.indexOf('\u200B') < 0, '零寬字元要被清掉');
+  assert.ok(cleaned.message.text.indexOf('\u202D') < 0, '雙向覆寫字元要被清掉');
+  assert.ok(cleaned.message.text.indexOf('<b>5 > 3</b>') >= 0, '一般文字要原樣保留（前端用 textContent 顯示）');
+  assert.strictEqual(cleaned.message.role, 'viewer');
+  assert.strictEqual(cleaned.message.name, '觀眾甲');
+
+  /* 頻率限制：太快 */
+  const tooFast = store.chat(res.code, viewer.viewerToken, '再一句');
+  assert.strictEqual(tooFast.ok, false);
+  assert.strictEqual(tooFast.code, 'toofast');
+  assert.strictEqual(tooFast.status, 429);
+
+  /* 長度上限 */
+  advance(Rooms.DEFAULTS.chatMinIntervalMs + 10);
+  const tooLong = store.chat(res.code, viewer.viewerToken, 'ㄅ'.repeat(Rooms.DEFAULTS.maxTextLength + 1));
+  assert.strictEqual(tooLong.ok, false);
+  assert.strictEqual(tooLong.code, 'toolong');
+
+  /* 觀察窗內講太多句 */
+  let blocked = null;
+  for (let i = 0; i < Rooms.DEFAULTS.chatMaxPerWindow + 3; i++) {
+    advance(Rooms.DEFAULTS.chatMinIntervalMs + 10);
+    const r = store.chat(res.code, viewer.viewerToken, '第 ' + i + ' 句');
+    if (!r.ok) { blocked = r; break; }
+  }
+  assert.ok(blocked, '短時間講太多句要被擋下來');
+  assert.strictEqual(blocked.code, 'toomany');
+
+  /* 等觀察窗過去就能再講 */
+  advance(Rooms.DEFAULTS.chatWindowMs + 100);
+  assert.strictEqual(store.chat(res.code, viewer.viewerToken, '我回來了').ok, true);
+
+  /* 主持人的顯示名稱不能被觀戰者冒充 */
+  advance(Rooms.DEFAULTS.chatMinIntervalMs + 10);
+  const impersonate = store.chat(res.code, viewer.viewerToken, '我是主持人', '小明');
+  assert.strictEqual(impersonate.ok, true);
+  assert.strictEqual(impersonate.message.role, 'viewer', '角色由 token 決定，不看送過來的名字');
+});
+
+ok('共享格子備註：每位成員可各留一則，玩家與所有觀戰者都能收到', () => {
+  const { store, advance } = makeStore();
+  const res = openRoom(store);
+  const a = store.addViewer(res.code, { name: '觀眾甲' });
+  const b = store.addViewer(res.code, { name: '觀眾乙' });
+  const events = [];
+  store.on((event) => { if (event.type === 'note') events.push(event.payload); });
+
+  const first = store.updateCellNote(res.code, a.viewerToken, 80, '可能是7', '觀眾甲');
+  assert.strictEqual(first.ok, true);
+  assert.strictEqual(first.notes.length, 1);
+  assert.strictEqual(first.notes[0].text, '可能是7');
+  assert.strictEqual(first.notes[0].authorId, a.viewerId);
+  assert.ok(JSON.stringify(first).indexOf(a.viewerToken) < 0, '共享備註不可以外洩 viewer token');
+
+  const second = store.updateCellNote(res.code, b.viewerToken, 80, '先看宮', '觀眾乙');
+  assert.strictEqual(second.ok, true);
+  assert.strictEqual(second.notes.length, 2, '不同觀戰者的備註要並存');
+  assert.strictEqual(events.length, 2, '每次備註都要廣播 note 事件');
+  assert.strictEqual(store.stateEvent(store.getRoom(res.code)).cellNotes[80].length, 2,
+    '新的觀戰者初始 state 要拿到共享備註');
+
+  advance(Rooms.DEFAULTS.noteMinIntervalMs + 1);
+  const edited = store.updateCellNote(res.code, a.viewerToken, 80, '答案7', '觀眾甲');
+  assert.strictEqual(edited.ok, true);
+  assert.strictEqual(edited.notes.length, 2, '同一人的更新不應增加重複備註');
+  assert.strictEqual(edited.notes.find((note) => note.authorId === a.viewerId).text, '答案7');
+
+  advance(Rooms.DEFAULTS.noteMinIntervalMs + 1);
+  const removed = store.updateCellNote(res.code, a.viewerToken, 80, '', '觀眾甲');
+  assert.strictEqual(removed.ok, true);
+  assert.strictEqual(removed.notes.length, 1, '送出空白要移除自己的備註');
+
+  const tooLong = store.updateCellNote(res.code, b.viewerToken, 80, '一二三四五六七八九十 一', '觀眾乙');
+  assert.strictEqual(tooLong.ok, false);
+  assert.strictEqual(tooLong.code, 'toolong');
+  const stranger = store.updateCellNote(res.code, 'x'.repeat(32), 80, '不能寫', '陌生人');
+  assert.strictEqual(stranger.ok, false);
+  assert.strictEqual(stranger.status, 403);
+
+  advance(Rooms.DEFAULTS.noteMinIntervalMs + 1);
+  const hostNote = store.updateCellNote(res.code, res.hostToken, 0, '主持人提示', '冒充名稱');
+  assert.strictEqual(hostNote.ok, true, '主持人也能留下共享備註');
+  assert.strictEqual(hostNote.notes[0].role, 'host');
+  assert.strictEqual(hostNote.notes[0].name, '小明');
+  assert.strictEqual(store.stateEvent(store.getRoom(res.code)).cellNotes[0][0].text, '主持人提示');
+});
+
+ok('新加入的人看得到最近的歷史訊息，而且訊息總數有上限', () => {
+  const { store, advance } = makeStore({ maxMessages: 6, historyForNewViewer: 4 });
+  const res = openRoom(store);
+  const a = store.addViewer(res.code, { name: '甲' });
+  for (let i = 0; i < 10; i++) {
+    advance(Rooms.DEFAULTS.chatWindowMs + 10);   // 避開頻率限制，這裡測的是保留數量
+    store.chat(res.code, a.viewerToken, '訊息 ' + i);
+  }
+  const room = store.getRoom(res.code);
+  assert.strictEqual(room.messages.length, 6, '房內保留的訊息數要有上限');
+  const b = store.addViewer(res.code, { name: '乙' });
+  assert.strictEqual(b.history.length, 4, '新加入的人拿到最近 N 則');
+  assert.strictEqual(b.history[b.history.length - 1].text, '訊息 9', '最後一則要是最新的');
+  assert.ok(b.state && b.state.board, '加入時要一併拿到目前盤面');
+});
+
+ok('房間總數有上限，滿了會回絕而不是無限開下去', () => {
+  const { store } = makeStore({ maxRooms: 3 });
+  const codes = [];
+  for (let i = 0; i < 3; i++) codes.push(openRoom(store).code);
+  assert.strictEqual(new Set(codes).size, 3, '房號不可以重複');
+  const full = store.createRoom({ snapshot: makeSnapshot() });
+  assert.strictEqual(full.ok, false);
+  assert.strictEqual(full.code, 'full');
+  assert.strictEqual(store.roomCount(), 3);
+});
+
+ok('房間生命週期：主持人斷線有寬限期，逾時關房，觀戰者一併被釋放', () => {
+  const { store, advance } = makeStore({ hostGraceMs: 60000 });
+  const res = openRoom(store);
+  store.attachHost(res.code, res.hostToken);
+  store.addViewer(res.code, { name: '甲' });
+
+  /* 斷線後在寬限期內憑 token 回來 */
+  store.detachHost(res.code, res.hostToken);
+  advance(30000);
+  store.sweep();
+  assert.ok(store.getRoom(res.code), '寬限期內房間要還在');
+  assert.strictEqual(store.attachHost(res.code, res.hostToken).ok, true, '主持人可以憑 token 回來');
+  assert.strictEqual(store.getRoom(res.code).hostOnline, true);
+
+  /* 這次不回來了 */
+  store.detachHost(res.code, res.hostToken);
+  advance(60001);
+  const closedCount = store.sweep();
+  assert.strictEqual(closedCount, 1);
+  assert.strictEqual(store.getRoom(res.code), null, '逾時要關房');
+  assert.strictEqual(store.listRooms().length, 0);
+  assert.strictEqual(store.addViewer(res.code, {}).status, 404, '關掉的房間不能再加入');
+});
+
+ok('房間生命週期：閒置與完成後都會被回收', () => {
+  const idle = makeStore({ idleCloseMs: 100000, hostGraceMs: 1e9 });
+  const r1 = openRoom(idle.store);
+  idle.store.attachHost(r1.code, r1.hostToken);
+  idle.advance(100001);
+  idle.store.sweep();
+  assert.strictEqual(idle.store.getRoom(r1.code), null, '閒置太久要回收');
+
+  const done = makeStore({ doneKeepMs: 50000, hostGraceMs: 1e9, idleCloseMs: 1e9 });
+  const r2 = openRoom(done.store);
+  done.store.attachHost(r2.code, r2.hostToken);
+  const solvedSnapshot = makeSnapshot({ status: 'won' });
+  done.store.updateState(r2.code, r2.hostToken, solvedSnapshot);
+  assert.strictEqual(done.store.getRoom(r2.code).status, 'done', '解完要標記成已完成');
+  done.advance(50001);
+  done.store.sweep();
+  assert.strictEqual(done.store.getRoom(r2.code), null, '完成後放太久也要回收');
+});
+
+ok('事件廣播：state／chat／presence／closed 都會送出，版本號單調遞增', () => {
+  const { store } = makeStore();
+  const events = [];
+  store.on((e) => events.push(e.type + ':' + e.code));
+  const res = openRoom(store);
+  const viewer = store.addViewer(res.code, { name: '甲' });
+
+  const base = makeSnapshot();
+  const v1 = store.updateState(res.code, res.hostToken, makeSnapshot({ values: base.values.slice(0, 35) + '4' + base.values.slice(36) }));
+  const v2 = store.updateState(res.code, res.hostToken, makeSnapshot({ values: base.values.slice(0, 35) + '4' + base.values.slice(36), elapsedMs: 1000 }));
+  assert.ok(v2.version > v1.version, '版本號必須遞增');
+
+  store.chat(res.code, viewer.viewerToken, '你好');
+  store.closeRoom(res.code, res.hostToken);
+
+  const kinds = events.map((e) => e.split(':')[0]);
+  ['state', 'chat', 'presence', 'closed'].forEach((k) => {
+    assert.ok(kinds.indexOf(k) >= 0, '缺少 ' + k + ' 事件');
+  });
+  assert.strictEqual(kinds[kinds.length - 2] || kinds[kinds.length - 1], 'closed', '關房事件要在最後送出');
+});
+
+ok('觀戰快照就是主持人狀態的唯讀鏡像，而且不含答案', () => {
+  const puzzle = S.generatePuzzle({ difficulty: 'easy', seed: 'MIRROR' });
+  const state = G.fromPuzzle(puzzle, {});
+  /* 主持人填一格、做一個筆記 */
+  let idx = -1;
+  for (let i = 0; i < 81; i++) if (!state.given[i]) { idx = i; break; }
+  G.setValue(state, idx, state.solution[idx]);
+  let noteIdx = -1;
+  for (let i = 0; i < 81; i++) if (!state.given[i] && !state.values[i]) { noteIdx = i; break; }
+  G.toggleNote(state, noteIdx, 5);
+  state.elapsedMs = 12345;
+
+  const snap = G.spectatorSnapshot(state, { selected: idx, paused: false });
+  assert.ok(!('solution' in snap), '快照不可以包含答案');
+  assert.strictEqual(JSON.stringify(snap).indexOf(G.gridToString(state.solution)), -1, '快照裡不該出現完整答案');
+
+  /* 伺服器端的結構驗證要接受它 */
+  const cleaned = Rooms.cleanSnapshot(snap, null);
+  assert.ok(cleaned, '伺服器要接受規則核心產生的快照');
+  assert.strictEqual(cleaned.filled, 1);
+
+  /* 觀戰端還原之後要和主持人看到的一致 */
+  const view = G.spectatorView(cleaned);
+  assert.strictEqual(view.readOnly, true, '觀戰盤面必須標記成唯讀');
+  assert.strictEqual(G.gridToString(view.values), G.gridToString(state.values));
+  assert.strictEqual(view.notes[noteIdx], state.notes[noteIdx]);
+  assert.strictEqual(view.selected, idx);
+  assert.strictEqual(view.elapsedMs, 12345);
+  assert.strictEqual(view.remaining, G.remaining(state));
+  assert.ok(!view.solution, '還原出來的觀戰盤面不該有答案');
+  /* 衝突用同一份規則核心算，不是伺服器算好再送 */
+  assert.deepStrictEqual(
+    Array.from(S.findConflicts(view.values)),
+    Array.from(S.findConflicts(state.values)),
+    '觀戰端算出來的衝突要和主持人一致'
+  );
+});
+
+ok('伺服器的線上端點、CORS 與 SSE 標頭都設定正確', () => {
+  const src = read(path.join(root, 'server.js'));
+  ['/api/rooms', 'stream', 'state', 'note', 'chat', 'close', 'invite'].forEach((k) => {
+    assert.ok(src.indexOf(k) >= 0, 'server.js 缺少端點：' + k);
+  });
+  assert.ok(/text\/event-stream/.test(src), 'SSE 要設對 Content-Type');
+  assert.ok(/no-cache, no-store, no-transform/.test(src), 'SSE 要關掉快取與轉換');
+  assert.ok(/X-Accel-Buffering/.test(src), 'SSE 要告訴反向代理不要緩衝');
+  assert.ok(/': ping/.test(src), 'SSE 要定期送心跳註解');
+  assert.ok(/Access-Control-Allow-Origin/.test(src), '跨來源要回 CORS 標頭');
+  assert.ok(/Access-Control-Allow-Methods/.test(src) && /OPTIONS/.test(src), '要處理預檢請求');
+  assert.ok(/Access-Control-Allow-Headers/.test(src), '預檢要允許 Content-Type');
+  assert.ok(/originBlocked/.test(src), '來源不在白名單時要擋下來');
+  assert.ok(/MAX_BODY/.test(src), 'POST 要有大小上限');
+  assert.ok(/SIGTERM/.test(src), '要處理優雅關閉');
+
+  const yaml = read(path.join(root, 'render.yaml'));
+  assert.ok(/GAME_ALLOWED_ORIGIN/.test(yaml), 'render.yaml 要有 GAME_ALLOWED_ORIGIN');
+});
+
+ok('前端：連線層集中在 online.js，聊天一律用 textContent 顯示', () => {
+  const online = read(path.join(publicDir, 'js', 'online.js'));
+  assert.ok(/w\.GameConfig|C\.url/.test(online), 'online.js 要從 GameConfig 取得連線位置');
+  assert.ok(/EventSource/.test(online), '下行要用 SSE');
+  assert.ok(/sendNote/.test(online), '線上連線層要提供共享備註上行');
+  assert.ok(/MAX_STREAM_RETRIES/.test(online), '重試要有上限，不可以無限轉圈');
+  assert.ok(/disabledReason/.test(online), '線上功能沒啟用時要說明原因');
+
+  /* 聊天與房間列表都放使用者輸入的文字，絕對不可以走 innerHTML */
+  const chatBlock = appSource.slice(appSource.indexOf('function onChatMessage'), appSource.indexOf('function submitChat'));
+  assert.ok(chatBlock.length > 200, '找不到聊天訊息的渲染程式');
+  assert.ok(!/innerHTMLs*=/.test(chatBlock), '聊天訊息不可以用 innerHTML');
+  assert.ok(/tx\.textContent = msg\.text/.test(chatBlock), '訊息內容必須用 textContent');
+  assert.ok(/who\.textContent/.test(chatBlock), '暱稱必須用 textContent');
+  assert.ok(/text\.textContent = note\.text/.test(appSource), '格子備註內容必須用 textContent');
+
+  const cardBlock = appSource.slice(appSource.indexOf('function roomCard'), appSource.indexOf('function agoText'));
+  assert.ok(!/innerHTMLs*=/.test(cardBlock), '房間卡片不可以用 innerHTML');
+  assert.ok(/who\.textContent = room\.hostName/.test(cardBlock), '主持人暱稱必須用 textContent');
+});
+
+ok('線上相關畫面、狀態與設定都在 index.html 裡', () => {
+  ['s-lobby', 's-watch', 'lobby-off', 'lobby-state', 'roomlist', 'watch-board',
+    'watch-overlay', 'chat-panel', 'chat-log', 'chat-form', 'b-chat', 'chat-badge',
+    'w-summary', 'watch-note-form', 'watch-note-input', 'watch-note-list', 'b-watch-note',
+    'hostbar', 'b-share', 'b-reinvite', 'b-close-room',
+    'settings-nick', 'settings-chatcue']
+    .forEach((id) => assert.ok(html.includes('id="' + id + '"'), '缺少線上模式的元素：' + id));
+  assert.ok(html.includes('js/online.js'), 'index.html 要載入 online.js');
+  const onlineAt = html.indexOf('js/online.js');
+  const appAt = html.indexOf('js/app.js');
+  assert.ok(onlineAt < appAt, 'online.js 要在 app.js 之前載入');
+  assert.ok(/id="watch-board"[^>]*readonly|class="board readonly"/.test(html), '觀戰盤面要標示成唯讀');
+  assert.ok(/aria-label="[^"]*唯讀[^"]*"/.test(html), '觀戰盤面要讓螢幕閱讀器知道是唯讀的');
+  assert.ok(/maxlength="10"/.test(html), '共享格子備註要限制在 10 字內');
+});
+
+ok('觀戰者只能備註與聊天：沒有數字盤、沒有遊戲提示', () => {
+  const watchStart = html.indexOf('id="s-watch"');
+  const watchEnd = html.indexOf('<!-- ============ 遊戲畫面', watchStart) >= 0
+    ? html.indexOf('<!-- ============ 遊戲畫面', watchStart)
+    : html.indexOf('</section>', html.indexOf('id="watch-overlay"'));
+  const watchHtml = html.slice(watchStart, watchEnd > watchStart ? watchEnd : watchStart + 4000);
+  assert.ok(watchHtml.indexOf('numpad') < 0, '觀戰畫面不可以有數字輸入盤');
+  assert.ok(watchHtml.indexOf('b-hint') < 0, '觀戰畫面不可以有提示按鈕');
+  assert.ok(watchHtml.indexOf('b-note') < 0, '觀戰畫面不可以有筆記按鈕');
+  assert.ok(watchHtml.indexOf('b-watch-note') >= 0, '觀戰畫面要有共享備註送出入口');
+  assert.ok(/cell-note-corner/.test(appSource), '每個格子要有右上角共享備註三角形');
+  /* 觀戰盤面的格子是 div，不是可以按的 button */
+  assert.ok(/watchCells\.push\(cell\)/.test(appSource) && /D\.createElement\('div'\)/.test(appSource),
+    '觀戰盤面的格子要用 div，不可以做成可點的按鈕');
+});
+
+ok('聊天室錨定左下角，操作 Summary 在寬版右半邊，都不會蓋住右上角設定', () => {
+  assert.ok(/\.chat-fab\{[^}]*position:fixed/.test(css), '留言入口要固定在畫面上');
+  assert.ok(/\.chat-fab\{[^}]*left:/.test(css) && /\.chat-fab\{[^}]*bottom:/.test(css), '留言入口要在左下角');
+  assert.ok(/\.chat-panel\{[^}]*left:/.test(css), '留言面板要錨定左邊');
+  assert.ok(/\.chat-fab\{[^}]*env\(safe-area-inset-left\)/.test(css), '留言入口要在安全區內');
+  /* z-index：設定按鈕 70、設定彈窗 100 都要高於留言板 */
+  const zOf = (sel) => {
+    const m = new RegExp('\\' + sel + '\\{[^}]*z-index:(\\d+)').exec(css);
+    return m ? Number(m[1]) : -1;
+  };
+  const fabZ = zOf('.settings-fab'), modalZ = zOf('.settings-modal');
+  const chatZ = zOf('.chat-panel'), chatFabZ = zOf('.chat-fab');
+  assert.ok(fabZ > chatZ && fabZ > chatFabZ, '右上角設定按鈕必須在留言板之上');
+  assert.ok(modalZ > fabZ, '設定彈窗要在最上層');
+  assert.ok(/\.summary\{/.test(css), '缺少操作 Summary 的樣式');
+  assert.ok(/\.summary\.collapsed \.sum-body\{display:none\}/.test(css), 'Summary 要可以收合');
+});
+
+ok('設定彈窗的捲動結構正確：只有中間會捲，標題與按鈕列固定', () => {
+  assert.ok(html.includes('id="settings-body"'), '缺少獨立的捲動區');
+  const bodyAt = html.indexOf('id="settings-body"');
+  const footAt = html.indexOf('settings-foot');
+  const headAt = html.indexOf('settings-head');
+  assert.ok(headAt < bodyAt && bodyAt < footAt, '順序要是 標題列 → 捲動區 → 按鈕列');
+  assert.ok(/\.settings-panel\{[^}]*display:flex/.test(css), '面板要用 flex 分成三段');
+  assert.ok(/\.settings-panel\{[^}]*flex-direction:column/.test(css));
+  assert.ok(/\.settings-panel\{[^}]*overflow:hidden/.test(css), '面板本身不可以是捲動容器');
+  assert.ok(/\.settings-body\{[^}]*overflow-y:auto/.test(css), '中間才是捲動區');
+  assert.ok(/\.settings-body\{[^}]*scrollbar-gutter:stable/.test(css), '要保留捲軸空間，避免內容左右跳動');
+  assert.ok(/\.settings-body\{[^}]*overscroll-behavior:contain/.test(css), '捲到底不要帶動整頁');
+  assert.ok(/\.settings-body::-webkit-scrollbar-thumb\{/.test(css), '捲軸要換成主題配色');
+  assert.ok(/\.settings-body\{[^}]*scrollbar-width:thin/.test(css), 'Firefox 也要細捲軸');
+  assert.ok(/\.settings-head\{[^}]*flex:0 0 auto/.test(css), '標題列要固定不捲');
+  assert.ok(/\.settings-foot\{[^}]*flex:0 0 auto/.test(css), '按鈕列要固定不捲');
+  assert.ok(/id="settings-reset" type="button"/.test(html) && /class="btn3d small settings-reset"/.test(html),
+    '恢復預設要沿用專案的立體 SVG 按鈕');
+  assert.ok(/class="btn3d small settings-done"/.test(html), '完成鈕要沿用專案的立體 SVG 按鈕');
+  assert.ok(/w\.UI\.repaintAll\(q\('settings-panel'\)\)/.test(appSource), '彈窗打開後要補畫立體按鈕');
+});
+
+/* ============================================================
  * server URL 參數化 與 部署準備
  * ========================================================== */
-section('6. server URL 參數化與部署準備');
+section('7. server URL 參數化與部署準備');
 
 const { execFileSync } = require('child_process');
 const configPath = path.join(publicDir, 'js', 'config.js');
@@ -660,7 +1253,7 @@ ok('單機模式不會發出任何網路請求', () => {
 });
 
 ok('連線位置只在 config.js 定義，其他前端檔案不硬編碼網址', () => {
-  ['rng.js', 'sudoku.js', 'game.js', 'storage.js', 'app.js', 'audio.js', 'svgui.js'].forEach((file) => {
+  ['rng.js', 'sudoku.js', 'game.js', 'storage.js', 'app.js', 'audio.js', 'svgui.js', 'online.js'].forEach((file) => {
     const src = read(path.join(publicDir, 'js', file)).replace(/http:\/\/www\.w3\.org[^'"]*/g, '');
     assert.ok(!/https?:\/\//.test(src), file + ' 不可以出現寫死的網址，要透過 GameConfig 取得');
   });
@@ -754,8 +1347,8 @@ ok('設定彈窗看得到連線狀態', () => {
 });
 
 
-/* ============ 6. 檔案編碼 ============ */
-section('7. 檔案編碼');
+/* ============ 8. 檔案編碼 ============ */
+section('8. 檔案編碼');
 
 const BAD_CHAR = String.fromCharCode(0xFFFD);   // 解碼失敗時會出現的替代字元
 
@@ -772,6 +1365,8 @@ ok('所有原始檔都是無 BOM 的 UTF-8', () => {
     path.join(publicDir, 'js', 'audio.js'),
     path.join(publicDir, 'js', 'svgui.js'),
     path.join(publicDir, 'js', 'config.js'),
+    path.join(publicDir, 'js', 'online.js'),
+    path.join(root, 'lib', 'rooms.js'),
     path.join(root, 'scripts', 'inject-server-url.js'),
     path.join(root, '.env.example'),
     __filename

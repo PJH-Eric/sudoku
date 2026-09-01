@@ -8,6 +8,8 @@
  *   - 六種尺寸／方向下：不可水平溢出、右上角設定按鈕在安全區內且夠大、按鈕命中區足夠
  *   - 完整一局：選難度 → 出題 → 點格子填數字 → 暫停 → 繼續 → 解到勝利 → 結算
  *   - 設定彈窗：開啟、焦點、Escape 關閉、焦點歸位、靜音設定會被保存
+ *   - 每格右上角共享備註三角形可以展開備註區
+ *   - 線上觀戰者可以輸入共享備註，且不會出現數字輸入／遊戲提示
  *   - 重新載入後可以續玩
  *   - server URL 參數化：單機／已連線／設定錯誤／連不上
  * 螢幕截圖會存到 screenshots/。
@@ -158,7 +160,9 @@ const PAGE_HELPERS = `
     board: function () {
       var b = document.getElementById('board');
       var r = b.getBoundingClientRect();
-      var wrap = document.querySelector('.boardwrap').getBoundingClientRect();
+      var wrap = document.querySelector('#s-game .boardwrap').getBoundingClientRect();
+      var body = document.querySelector('#s-game .gamebody').getBoundingClientRect();
+      var screen = document.getElementById('s-game').getBoundingClientRect();
       var cell = b.querySelector('.cell').getBoundingClientRect();
       var room = Math.min(wrap.width, wrap.height);
       return {
@@ -195,6 +199,19 @@ async function main() {
     stdio: 'ignore'
   });
   await sleep(700);
+  const onlineRoomResponse = await fetch('http://127.0.0.1:' + PORT + '/api/rooms', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      hostName: '瀏覽器測試主持人', difficulty: 'easy', label: '簡單', seed: 'BROW',
+      snapshot: {
+        puzzle: '0'.repeat(81), values: '0'.repeat(81), notes: new Array(81).fill(0),
+        selected: -1, elapsedMs: 0, hintsUsed: 0, mistakes: 0, status: 'playing'
+      }
+    })
+  });
+  const onlineRoom = await onlineRoomResponse.json();
+  if (!onlineRoomResponse.ok || !onlineRoom.ok) throw new Error('無法建立瀏覽器線上觀戰測試房間');
 
   console.log('啟動無頭瀏覽器…');
   const browser = spawn(chrome, [
@@ -251,6 +268,14 @@ async function main() {
   async function shot(name) {
     const res = await cdp.send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync(path.join(SHOTS, name + '.png'), Buffer.from(res.data, 'base64'));
+  }
+  async function waitForPage(expression, timeoutMs) {
+    const deadline = Date.now() + (timeoutMs || 8000);
+    while (Date.now() < deadline) {
+      if (await cdp.eval('return !!(' + expression + ');')) return true;
+      await sleep(120);
+    }
+    return false;
   }
   async function setViewport(v) {
     await cdp.send('Emulation.setDeviceMetricsOverride', {
@@ -320,7 +345,8 @@ async function main() {
       "document.getElementById('seed-input').value='RWD1';" +
       "document.getElementById('b-start').click(); return 1;"
     );
-    await sleep(1400);
+    await waitForPage("document.getElementById('s-game').classList.contains('active')", 10000);
+    await sleep(180);
     L = await cdp.eval('return JSON.stringify(window.__probe.layout());');
     info = JSON.parse(L);
     screensToCheck.push(['遊戲中', info]);
@@ -334,6 +360,13 @@ async function main() {
     /* 9×9 固定格線的單格必然比一般按鈕小；30px 是常見數獨 App 的下限，仍然好點。
      * 極矮的橫向手機（例如 667×375）會落在 31~32px，直向會回到 35px 以上。 */
     check('每一格至少 30px 好點得到', boardInfo.cell >= 30, '格子 ' + boardInfo.cell + 'px（盤面 ' + boardInfo.width + 'px）');
+    const noteChrome = JSON.parse(await cdp.eval(
+      "var corner=document.querySelector('#board .cell .cell-note-corner');" +
+      "if(corner) corner.click();" +
+      "return JSON.stringify({corners:document.querySelectorAll('#board .cell .cell-note-corner').length," +
+      "open:!!corner && !corner.parentNode.querySelector('.cell-note-popover').hidden});"
+    ));
+    check('每格都有右上角備註三角形且可展開', noteChrome.corners === 81 && noteChrome.open, JSON.stringify(noteChrome));
     await shot(v.name + '-5-遊戲中');
 
     /* 暫停 */
@@ -406,25 +439,27 @@ async function main() {
 
   /* 點一個空格，用數字盤填入正確答案 */
   const placed = await cdp.eval(
-    "var cells=document.querySelectorAll('.cell');" +
+    "var cells=document.querySelectorAll('#board .cell');" +
     "var idx=-1; for(var i=0;i<81;i++){ if(!cells[i].classList.contains('given')){ idx=i; break; } }" +
     "cells[idx].click();" +
-    "var before=document.querySelector('.cell.sel')===cells[idx];" +
+    "var before=document.querySelector('#board .cell.sel')===cells[idx];" +
     "return JSON.stringify({idx:idx, selected:before});"
   );
   check('點格子會被選取', JSON.parse(placed).selected, placed);
 
   const typed = await cdp.eval(
     "var idx=" + JSON.parse(placed).idx + ";" +
-    "document.querySelector('.numkey[data-d=\"5\"]').click();" +
-    "var cell=document.querySelectorAll('.cell')[idx];" +
+    "var save=JSON.parse(localStorage.getItem('sd_save')||'{}');" +
+    "var digit=save.solution.charAt(idx);" +
+    "document.querySelector('.numkey[data-d=\"'+digit+'\"]').click();" +
+    "var cell=document.querySelectorAll('#board .cell')[idx];" +
     "return JSON.stringify({text:cell.querySelector('.v').textContent, feedback:document.getElementById('feedback').textContent});"
   );
   check('按數字盤會填入數字並給文字回饋', JSON.parse(typed).text === '5' && JSON.parse(typed).feedback.length > 0, typed);
 
   /* 點題目原有的格子 → 應該被擋下並說明原因 */
   const blocked = await cdp.eval(
-    "var g=document.querySelector('.cell.given'); g.click();" +
+    "var g=document.querySelector('#board .cell.given'); g.click();" +
     "document.querySelector('.numkey[data-d=\"7\"]').click();" +
     "return JSON.stringify({text:g.querySelector('.v').textContent, feedback:document.getElementById('feedback').textContent, cls:document.getElementById('feedback').className});"
   );
@@ -434,7 +469,7 @@ async function main() {
   /* 筆記模式 */
   const noted = await cdp.eval(
     "document.getElementById('b-note').click();" +
-    "var cells=document.querySelectorAll('.cell'); var idx=-1;" +
+    "var cells=document.querySelectorAll('#board .cell'); var idx=-1;" +
     "for(var i=0;i<81;i++){ if(!cells[i].classList.contains('given') && !cells[i].querySelector('.v').textContent){ idx=i; break; } }" +
     "cells[idx].click(); document.querySelector('.numkey[data-d=\"3\"]').click();" +
     "var notes=cells[idx].querySelectorAll('.nt i.on');" +
@@ -455,14 +490,14 @@ async function main() {
   check('復原與重做都有回饋', /復原/.test(JSON.parse(undone).undo) && /重做/.test(JSON.parse(undone).redo), undone);
 
   /* 鍵盤操作 */
-  await cdp.eval("document.querySelectorAll('.cell')[0].click(); return 1;");
+  await cdp.eval("document.querySelectorAll('#board .cell')[0].click(); return 1;");
   for (const key of ['ArrowRight', 'ArrowDown']) {
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: key === 'ArrowRight' ? 39 : 40 });
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode: key === 'ArrowRight' ? 39 : 40 });
   }
   await sleep(150);
   const moved = await cdp.eval(
-    "var sel=document.querySelector('.cell.sel'); return sel ? sel.getAttribute('data-i') : 'none';"
+    "var sel=document.querySelector('#board .cell.sel'); return sel ? sel.getAttribute('data-i') : 'none';"
   );
   check('方向鍵可以移動選格', moved === '10', '目前選在索引 ' + moved);
 
@@ -475,7 +510,7 @@ async function main() {
     "hints:document.getElementById('st-hint').textContent, miss:document.getElementById('st-miss').textContent," +
     "time:document.getElementById('st-time').textContent," +
     "paused:document.getElementById('pause-overlay').classList.contains('on')," +
-    "notes:document.querySelectorAll('.nt i.on').length});"
+    "notes:document.querySelectorAll('#board .nt i.on').length});"
   );
   const rt = JSON.parse(restarted);
   check('這題重來會清空作答但保留同一題',
@@ -503,15 +538,16 @@ async function main() {
   const practice = await cdp.eval(
     "document.getElementById('b-tut-play').click(); return 1;"
   );
-  await sleep(1200);
+  await waitForPage("document.getElementById('s-game').classList.contains('active')", 10000);
+  await sleep(180);
   const practiceScreen = await cdp.eval(
     "return JSON.stringify({screen:(document.querySelector('.screen.active')||{}).id," +
     "diff:document.getElementById('g-diff').textContent});"
   );
-  check('教學結尾的「立即練習」會直接開一局簡單題',
-    JSON.parse(practiceScreen).screen === 's-game' && JSON.parse(practiceScreen).diff === '簡單', practiceScreen);
+  check('教學結尾的「立即練習」會直接開一局新手入門',
+    JSON.parse(practiceScreen).screen === 's-game' && JSON.parse(practiceScreen).diff === '新手入門', practiceScreen);
 
-  /* 回到主選單；此時存檔是剛才那局「立即練習」的簡單題 */
+  /* 回到主選單；此時存檔是剛才那局「立即練習」的新手入門題 */
   await cdp.eval("document.getElementById('b-quit').click(); return 1;");
   await sleep(200);
   const savedSeed = await cdp.eval(
@@ -648,6 +684,36 @@ async function main() {
   );
   const pl = JSON.parse(playable);
   check('連不上伺服器時照樣出得了題（單機不受影響）', pl.given > 0 && pl.unique === 1, playable);
+
+  /* ---------- 線上觀戰者 UI：只允許共享備註與聊天室 ---------- */
+  await setViewport(VIEWPORTS[1]);
+  await goto(BASE + '?server=' + encodeURIComponent('http://127.0.0.1:' + PORT) +
+    '&room=' + encodeURIComponent(onlineRoom.code) + '&invite=' + encodeURIComponent(onlineRoom.inviteToken));
+  const watchReady = await waitForPage("document.getElementById('s-watch').classList.contains('active') && document.querySelectorAll('#watch-board .cell').length === 81", 5000);
+  await waitForPage("document.getElementById('sum-conn').getAttribute('data-state') === 'open'", 5000);
+  const watchUi = JSON.parse(await cdp.eval(
+    "return JSON.stringify({ready:" + String(watchReady) + "," +
+    "corners:document.querySelectorAll('#watch-board .cell .cell-note-corner').length," +
+    "input:document.getElementById('watch-note-input').maxLength," +
+    "numpad:!!document.querySelector('#s-watch .numpad'),hint:!!document.querySelector('#s-watch #b-hint')," +
+    "cellTag:document.querySelector('#watch-board .cell').tagName});"
+  ));
+  check('觀戰者畫面每格都有備註三角形，且沒有數字盤／遊戲提示',
+    watchUi.ready && watchUi.corners === 81 && watchUi.input === 10 && !watchUi.numpad && !watchUi.hint && watchUi.cellTag === 'DIV', JSON.stringify(watchUi));
+  const noteUi = JSON.parse(await cdp.eval(
+    "var c=document.querySelector('#watch-board .cell[data-i=\"80\"]'); c.click();" +
+    "var i=document.getElementById('watch-note-input'); i.value='可能是7';" +
+    "document.getElementById('watch-note-form').requestSubmit();" +
+    "return JSON.stringify({selected:c.classList.contains('watch-sel'),cell:c.getAttribute('data-i'),value:i.value});"
+  ));
+  const noteAppeared = await waitForPage("document.querySelector('#watch-board .cell[data-i=\"80\"]').classList.contains('has-shared-notes')", 5000);
+  const popover = JSON.parse(await cdp.eval(
+    "var c=document.querySelector('#watch-board .cell[data-i=\"80\"] .cell-note-corner'); c.click();" +
+    "var p=c.parentNode.querySelector('.cell-note-popover');" +
+    "return JSON.stringify({open:!p.hidden,text:p.textContent});"
+  ));
+  check('觀戰者可以送出 10 字內共享備註', noteUi.selected && noteUi.cell === '80' && noteAppeared, JSON.stringify({ ui: noteUi, appeared: noteAppeared }));
+  check('點右上角三角形會顯示共享備註內容', popover.open && popover.text.indexOf('可能是7') >= 0, JSON.stringify(popover));
 
   /* ---------- 收尾 ---------- */
   try { ws.close(); } catch (e) {}

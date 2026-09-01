@@ -27,6 +27,7 @@
       <div class="home-btns">
         <button class="btn3d big" data-color="grape" id="b-continue" hidden><span class="ico">▶</span>繼續上一題</button>
         <button class="btn3d big" data-color="mint" id="b-new"><span class="ico">✏️</span>開始新題目</button>
+        <button class="btn3d" data-color="peach" id="b-online"><span class="ico">📺</span>線上觀戰與留言</button>
         <div class="home-row">
           <button class="btn3d" data-color="lemon" id="b-stats"><span class="ico">🏅</span>我的紀錄</button>
           <button class="btn3d" data-color="sky" id="b-help"><span class="ico">📖</span>玩法教學</button>
@@ -46,21 +47,25 @@
       </div>
 
       <div class="diff-row" id="opt-diff">
+        <button class="optcard" data-v="beginner" type="button">
+          <b>新手入門</b><span class="s">48–55 格提示</span>
+          <span class="t">大多數步驟是「整列／整行／整宮只剩一格」，第一次玩也找得到下一步</span>
+        </button>
         <button class="optcard" data-v="easy" type="button">
-          <b>簡單</b><span class="s">40 格左右提示</span>
-          <span class="t">只要用「唯一候選數」就能一路填完</span>
+          <b>簡單</b><span class="s">40–45 格提示</span>
+          <span class="t">全程只要用「唯一候選數」：某一格只剩一個數字可以填</span>
         </button>
         <button class="optcard" data-v="medium" type="button">
-          <b>普通</b><span class="s">30 格左右提示</span>
-          <span class="t">需要找出「這一宮只有這格放得下 X」</span>
+          <b>普通</b><span class="s">32–36 格提示</span>
+          <span class="t">會卡住好幾次，要找「這一宮只有這格放得下 X」的隱藏唯一數</span>
         </button>
         <button class="optcard" data-v="hard" type="button">
-          <b>困難</b><span class="s">26 格左右提示</span>
-          <span class="t">需要區塊摒除、裸對等刪候選數的技巧</span>
+          <b>困難</b><span class="s">26–30 格提示</span>
+          <span class="t">隱藏唯一數還不夠，整局要用區塊摒除、裸對先刪候選數</span>
         </button>
         <button class="optcard" data-v="expert" type="button">
-          <b>專家</b><span class="s">24 格左右提示</span>
-          <span class="t">基本技巧推不完，要靠假設與試誤</span>
+          <b>專家</b><span class="s">21–25 格提示</span>
+          <span class="t">盤面不對稱，卡點更多更早，還可能用到裸三、隱藏對或 X-Wing</span>
         </button>
       </div>
 
@@ -72,8 +77,143 @@
       </div>
       <p class="hint-note">輸入同一組種子＋同一個難度，永遠會拿到同一題，可以跟朋友比賽同一題。</p>
 
+      <p class="setup-online" id="setup-online" hidden>📺 開房模式：出題後會自動開一間觀戰房，你照常解題，別人可以進來看盤面與留言。</p>
+
       <div class="panel-foot">
         <button class="btn3d big" data-color="grape" id="b-start">出題開始 ▶</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 線上觀戰大廳 ============ -->
+  <section class="screen" id="s-lobby" aria-label="線上觀戰大廳">
+    <div class="panel">
+      <div class="panel-head">
+        <button class="btn3d small" data-color="cream" data-back="s-home">◀ 返回</button>
+        <h2>📺 線上觀戰</h2>
+        <span class="spacer"></span>
+      </div>
+
+      <!-- 線上功能沒有啟用時：講清楚原因與怎麼開啟，不做假的房間列表 -->
+      <div class="lobby-off" id="lobby-off" hidden>
+        <div class="state-face" aria-hidden="true">🔌</div>
+        <h3 id="lobby-off-title">目前是單機模式</h3>
+        <p id="lobby-off-note">還沒有設定遊戲伺服器，所以沒有線上房間可以看。單機的部分完全不受影響。</p>
+        <details class="lobby-help">
+          <summary>要怎麼開啟線上觀戰？</summary>
+          <div>
+            <p>線上觀戰需要一台一直開著的伺服器。設定方式有兩種：</p>
+            <p>1. 自己跑：在電腦上執行 <code>npm start</code>，畫面會印出這台電腦的網址；再用 <code>?server=（那個網址）</code> 打開這個頁面就會連過去。</p>
+            <p>2. 部署版：把 <code>server.js</code> 部到雲端，再把網址放進部署設定的 <code>GAME_SERVER_URL</code>。詳細步驟在 README 第七章。</p>
+          </div>
+        </details>
+        <div class="state-btns">
+          <button class="btn3d" data-color="cream" data-back="s-home">🏠 回主選單</button>
+        </div>
+      </div>
+
+      <div id="lobby-live">
+        <div class="lobby-me">
+          <label class="lobby-nick" for="lobby-nick">
+            <span>你的暱稱</span>
+            <input id="lobby-nick" maxlength="12" autocomplete="off" spellcheck="false" placeholder="路過的觀眾">
+          </label>
+          <button class="btn3d" data-color="mint" id="b-lobby-host"><span class="ico">✏️</span>開一間房來解題</button>
+        </div>
+
+        <div class="lobby-join">
+          <label class="sr-only" for="lobby-code">房號</label>
+          <input id="lobby-code" maxlength="4" autocomplete="off" spellcheck="false" placeholder="有房號？直接輸入" aria-describedby="lobby-join-note">
+          <button class="btn3d small" data-color="grape" id="b-lobby-join">加入觀戰</button>
+        </div>
+        <p class="hint-note" id="lobby-join-note">房號是 4 個英數字，不會用到容易看錯的 I、O、0、1。</p>
+
+        <div class="lobby-bar">
+          <h3 class="lbl">目前開著的房間</h3>
+          <button class="btn3d small" data-color="cream" id="b-lobby-refresh">🔄 重新整理</button>
+        </div>
+        <p class="lobby-state" id="lobby-state" role="status" aria-live="polite">正在讀取房間列表…</p>
+        <div class="roomlist" id="roomlist"></div>
+        <p class="hint-note">房間只存在伺服器的記憶體裡：伺服器重新部署或重啟，房間就會消失。免費方案閒置約 15 分鐘會休眠，第一次連線可能要等十幾秒喚醒。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 觀戰畫面（唯讀） ============ -->
+  <section class="screen" id="s-watch" aria-label="觀戰中">
+    <div class="gtop">
+      <header class="gbar">
+        <button class="btn3d small" data-color="cream" id="b-watch-leave">◀ 離開</button>
+        <div class="gmeta">
+          <span class="chip live" id="w-live">👀 觀戰中</span>
+          <span class="chip" id="w-host">主持人 —</span>
+          <span class="chip ghost" id="w-diff">—</span>
+          <span class="chip ghost" id="w-code">房號 —</span>
+        </div>
+        <span class="spacer"></span>
+      </header>
+
+      <div class="statbar" id="w-statbar">
+        <div class="stat"><span class="k">時間</span><b id="w-time">00:00</b></div>
+        <div class="stat"><span class="k">剩餘</span><b id="w-left">—</b></div>
+        <div class="stat"><span class="k">提示</span><b id="w-hint">0</b></div>
+        <div class="stat"><span class="k">填錯</span><b id="w-miss">0</b></div>
+        <div class="stat"><span class="k">觀戰</span><b id="w-viewers">0</b></div>
+      </div>
+    </div>
+
+    <div class="gamebody watchbody">
+      <div class="boardwrap">
+        <div class="board readonly" id="watch-board" role="grid" aria-label="觀戰盤面，主持人盤面唯讀，可點格子查看或填寫共享備註"></div>
+      </div>
+
+      <!-- 操作 Summary：寬版放在右半邊，窄版收合成一段可展開的摘要 -->
+      <aside class="summary" id="w-summary" aria-label="觀戰資訊摘要">
+        <div class="sum-head">
+          <h3>觀戰資訊</h3>
+          <button class="sum-toggle" id="b-sum-toggle" type="button" aria-expanded="true" aria-controls="w-sum-body">收合</button>
+        </div>
+        <div class="sum-body" id="w-sum-body">
+          <div class="sum-row"><span>你的角色</span><b id="sum-role">觀戰中（唯讀）</b></div>
+          <div class="sum-row"><span>連線狀態</span><b id="sum-conn">連線中…</b></div>
+          <div class="sum-row"><span>主持人</span><b id="sum-host">—</b></div>
+          <div class="sum-row"><span>難度</span><b id="sum-diff">—</b></div>
+          <div class="sum-row"><span>題目種子</span><b id="sum-seed">—</b></div>
+          <div class="sum-row"><span>目前進度</span><b id="sum-progress">—</b></div>
+          <div class="sum-row"><span>主持人動態</span><b id="sum-activity">等待第一筆盤面…</b></div>
+          <p class="sum-note" id="sum-goal">目標：把每一列、每一行、每一宮的 1–9 各填一次。</p>
+          <section class="watch-note-tools" id="watch-note-tools" aria-label="共享格子備註">
+            <div class="watch-note-head">
+              <h3>共享格子備註</h3>
+              <b id="watch-note-cell">尚未選格</b>
+            </div>
+            <p class="watch-note-help" id="watch-note-help">點盤面右上角的小三角形或任一格，就能查看這格備註；你也可以留下最多 10 個字，玩家和其他觀戰者都看得到。</p>
+            <form class="watch-note-form" id="watch-note-form" autocomplete="off">
+              <label class="sr-only" for="watch-note-input">這格的共享備註</label>
+              <input id="watch-note-input" maxlength="10" placeholder="這格備註（10字內）" enterkeyhint="send">
+              <button class="btn3d small" data-color="grape" id="b-watch-note" type="submit">送出備註</button>
+            </form>
+            <div class="watch-note-list" id="watch-note-list" role="log" aria-live="polite" aria-label="目前格子的共享備註"></div>
+            <p class="watch-note-limit">送出空白會移除你在這格的備註；觀戰者不能填數字或改動主持人的盤面。</p>
+          </section>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="gfoot">
+      <p class="feedback" id="w-feedback" role="status" aria-live="polite">正在連線到房間…</p>
+    </footer>
+
+    <!-- 斷線／房間關閉／連不上：一定要有明確狀態與返回路徑，不無限轉圈 -->
+    <div class="overlay" id="watch-overlay" aria-hidden="true">
+      <div class="ovbox" role="dialog" aria-modal="true" aria-labelledby="watch-ov-title" tabindex="-1" id="watch-ov-box">
+        <div class="state-face" id="watch-ov-face" aria-hidden="true">📴</div>
+        <h2 id="watch-ov-title">房間已關閉</h2>
+        <p id="watch-ov-note">主持人已經離開，這個房間結束了。</p>
+        <div class="state-btns">
+          <button class="btn3d" data-color="grape" id="b-watch-retry">🔄 再連一次</button>
+          <button class="btn3d" data-color="cream" id="b-watch-lobby">📺 回大廳</button>
+        </div>
       </div>
     </div>
   </section>
@@ -118,6 +258,16 @@
         <div class="stat"><span class="k">剩餘</span><b id="st-left">0</b></div>
         <div class="stat"><span class="k">提示</span><b id="st-hint">0</b></div>
         <div class="stat"><span class="k">填錯</span><b id="st-miss">0</b></div>
+      </div>
+
+      <!-- 開放觀戰時才出現：房號、觀戰人數、連線狀態、分享連結、關房 -->
+      <div class="hostbar" id="hostbar" hidden>
+        <span class="chip live" id="h-code">房號 —</span>
+        <span class="chip ghost" id="h-viewers">👀 0 人觀戰</span>
+        <span class="chip ghost" id="h-conn" role="status" aria-live="polite">連線中…</span>
+        <button class="btn3d small" data-color="sky" id="b-share">🔗 分享連結</button>
+        <button class="btn3d small" data-color="cream" id="b-reinvite">↻ 換連結</button>
+        <button class="btn3d small" data-color="cream" id="b-close-room">關閉房間</button>
       </div>
     </div>
 
@@ -207,93 +357,127 @@
         <button class="btn3d small" data-color="grape" id="b-tut-next">下一段 ▶</button>
       </div>
       <div class="panel-foot">
-        <button class="btn3d" data-color="mint" id="b-tut-play">立即練習一題（簡單）</button>
+        <button class="btn3d" data-color="mint" id="b-tut-play">立即練習一題（新手入門）</button>
       </div>
     </div>
+  </section>
+
+  <!-- ============ 房間留言板（錨定左下角，不遮住右上角設定） ============ -->
+  <button class="btn3d icononly chat-fab" data-color="mint" id="b-chat" type="button" hidden
+          aria-label="開啟房間留言板" aria-expanded="false" aria-controls="chat-panel">💬<span class="chat-badge" id="chat-badge" hidden>0</span></button>
+
+  <div class="chat-backdrop" id="chat-backdrop" hidden></div>
+  <section class="chat-panel" id="chat-panel" aria-label="房間留言板" aria-hidden="true">
+    <div class="chat-head">
+      <h3 id="chat-title">💬 房間留言</h3>
+      <span class="chat-room" id="chat-room">房號 —</span>
+      <button class="chat-close" id="chat-close" type="button" aria-label="收起留言板">✕</button>
+    </div>
+    <p class="chat-conn" id="chat-conn" role="status" aria-live="polite">連線中…</p>
+    <div class="chat-log" id="chat-log" role="log" aria-live="polite" aria-label="房間留言內容"></div>
+    <form class="chat-form" id="chat-form" autocomplete="off">
+      <label class="sr-only" for="chat-input">輸入留言</label>
+      <input id="chat-input" maxlength="120" placeholder="說點什麼…" enterkeyhint="send">
+      <button class="btn3d small" data-color="grape" id="b-chat-send" type="submit">送出</button>
+    </form>
+    <p class="chat-note" id="chat-note">最多 120 字，送太快會被伺服器擋下來。</p>
   </section>
 
   <!-- ============ 遊戲設定彈窗 ============ -->
   <div class="settings-modal" id="settings-modal" role="dialog" aria-modal="true"
        aria-labelledby="settings-title" aria-hidden="true">
     <div class="settings-backdrop" data-settings-close></div>
+    <!-- 三段式：標題列固定在上、按鈕列固定在下，只有中間的 settings-body 會捲動，
+         這樣內容再長，「完成」與關閉鈕都不會被捲走。 -->
     <section class="settings-panel" id="settings-panel" tabindex="-1">
       <div class="settings-head">
-        <h2 id="settings-title">⚙ 遊戲設定</h2>
+        <span class="settings-badge" aria-hidden="true">⚙</span>
+        <h2 id="settings-title">遊戲設定</h2>
         <button class="settings-close" id="settings-close" type="button" aria-label="關閉遊戲設定">✕</button>
       </div>
 
-      <div class="settings-group">
-        <h3>聲音</h3>
-        <label class="setting-toggle" for="settings-music">
-          <span><b>背景音樂</b><small id="settings-music-status">開啟</small></span>
-          <input id="settings-music" type="checkbox" checked>
-        </label>
-        <label class="setting-range" for="settings-music-volume">
-          <span>音樂音量 <output id="settings-music-volume-value">70%</output></span>
-          <input id="settings-music-volume" type="range" min="0" max="100" step="5" value="70">
-        </label>
-        <label class="setting-toggle" for="settings-sfx">
-          <span><b>遊戲音效</b><small id="settings-sfx-status">開啟</small></span>
-          <input id="settings-sfx" type="checkbox" checked>
-        </label>
-        <label class="setting-range" for="settings-sfx-volume">
-          <span>音效音量 <output id="settings-sfx-volume-value">100%</output></span>
-          <input id="settings-sfx-volume" type="range" min="0" max="100" step="5" value="100">
-        </label>
-        <p class="settings-note" id="settings-audio-note">聲音會在你第一次點畫面之後才開始播放，這是瀏覽器的規定。</p>
-      </div>
-
-      <div class="settings-group">
-        <h3>操作</h3>
-        <label class="setting-toggle" for="settings-haptic">
-          <span><b>觸控震動</b><small>手機／平板填入數字時輕震一下</small></span>
-          <input id="settings-haptic" type="checkbox" checked>
-        </label>
-        <label class="setting-toggle" for="settings-motion">
-          <span><b>動畫效果</b><small>關閉可減少動態，適合會頭暈的人</small></span>
-          <input id="settings-motion" type="checkbox" checked>
-        </label>
-        <label class="setting-toggle" for="settings-autonotes">
-          <span><b>自動整理筆記</b><small>填入數字後自動清掉同列行宮的相同筆記</small></span>
-          <input id="settings-autonotes" type="checkbox" checked>
-        </label>
-      </div>
-
-      <div class="settings-group">
-        <h3>盤面顯示</h3>
-        <label class="setting-toggle" for="settings-mistakes">
-          <span><b>即時標示填錯</b><small>關閉後要自己檢查，難度更高</small></span>
-          <input id="settings-mistakes" type="checkbox" checked>
-        </label>
-        <label class="setting-toggle" for="settings-same">
-          <span><b>高亮相同數字</b><small>點一格時，同樣的數字一起變色</small></span>
-          <input id="settings-same" type="checkbox" checked>
-        </label>
-        <label class="setting-toggle" for="settings-units">
-          <span><b>高亮同列行宮</b><small>讓相關的格子淡淡打亮</small></span>
-          <input id="settings-units" type="checkbox" checked>
-        </label>
-        <label class="setting-toggle" for="settings-remaining">
-          <span><b>數字盤顯示剩餘</b><small>每個數字還有幾格沒填</small></span>
-          <input id="settings-remaining" type="checkbox" checked>
-        </label>
-      </div>
-
-      <div class="settings-group">
-        <h3>連線</h3>
-        <div class="setting-static">
-          <span><b>遊戲伺服器</b><small id="settings-server-url">未設定（單機模式）</small></span>
-          <span class="server-pill" id="settings-server-state" role="status" aria-live="polite">單機</span>
+      <div class="settings-body" id="settings-body" tabindex="0" role="group" aria-label="設定項目">
+        <div class="settings-group">
+          <h3><span class="gico" aria-hidden="true">🎵</span>聲音</h3>
+          <label class="setting-toggle" for="settings-music">
+            <span><b>背景音樂</b><small id="settings-music-status">開啟</small></span>
+            <input id="settings-music" type="checkbox" checked>
+          </label>
+          <label class="setting-range" for="settings-music-volume">
+            <span>音樂音量 <output id="settings-music-volume-value">70%</output></span>
+            <input id="settings-music-volume" type="range" min="0" max="100" step="5" value="70">
+          </label>
+          <label class="setting-toggle" for="settings-sfx">
+            <span><b>遊戲音效</b><small id="settings-sfx-status">開啟</small></span>
+            <input id="settings-sfx" type="checkbox" checked>
+          </label>
+          <label class="setting-range" for="settings-sfx-volume">
+            <span>音效音量 <output id="settings-sfx-volume-value">100%</output></span>
+            <input id="settings-sfx-volume" type="range" min="0" max="100" step="5" value="100">
+          </label>
+          <label class="setting-toggle" for="settings-chatcue">
+            <span><b>留言提示音</b><small>觀戰房間有新訊息時輕輕響一聲</small></span>
+            <input id="settings-chatcue" type="checkbox" checked>
+          </label>
+          <p class="settings-note" id="settings-audio-note">聲音會在你第一次點畫面之後才開始播放，這是瀏覽器的規定。</p>
         </div>
-        <p class="settings-note" id="settings-server-note">這是單機遊戲，沒有伺服器也能完整遊玩；成績與進度都存在這台裝置上。</p>
+
+        <div class="settings-group">
+          <h3><span class="gico" aria-hidden="true">🖐</span>操作</h3>
+          <label class="setting-toggle" for="settings-haptic">
+            <span><b>觸控震動</b><small>手機／平板填入數字時輕震一下</small></span>
+            <input id="settings-haptic" type="checkbox" checked>
+          </label>
+          <label class="setting-toggle" for="settings-motion">
+            <span><b>動畫效果</b><small>關閉可減少動態，適合會頭暈的人</small></span>
+            <input id="settings-motion" type="checkbox" checked>
+          </label>
+          <label class="setting-toggle" for="settings-autonotes">
+            <span><b>自動整理筆記</b><small>填入數字後自動清掉同列行宮的相同筆記</small></span>
+            <input id="settings-autonotes" type="checkbox" checked>
+          </label>
+        </div>
+
+        <div class="settings-group">
+          <h3><span class="gico" aria-hidden="true">🔢</span>盤面顯示</h3>
+          <label class="setting-toggle" for="settings-mistakes">
+            <span><b>即時標示填錯</b><small>關閉後要自己檢查，難度更高</small></span>
+            <input id="settings-mistakes" type="checkbox" checked>
+          </label>
+          <label class="setting-toggle" for="settings-same">
+            <span><b>高亮相同數字</b><small>點一格時，同樣的數字一起變色</small></span>
+            <input id="settings-same" type="checkbox" checked>
+          </label>
+          <label class="setting-toggle" for="settings-units">
+            <span><b>高亮同列行宮</b><small>讓相關的格子淡淡打亮</small></span>
+            <input id="settings-units" type="checkbox" checked>
+          </label>
+          <label class="setting-toggle" for="settings-remaining">
+            <span><b>數字盤顯示剩餘</b><small>每個數字還有幾格沒填</small></span>
+            <input id="settings-remaining" type="checkbox" checked>
+          </label>
+        </div>
+
+        <div class="settings-group">
+          <h3><span class="gico" aria-hidden="true">📺</span>線上觀戰</h3>
+          <label class="setting-text" for="settings-nick">
+            <span><b>你的暱稱</b><small>開房與留言時顯示的名字，最多 12 個字</small></span>
+            <input id="settings-nick" type="text" maxlength="12" autocomplete="off" spellcheck="false" placeholder="路過的觀眾">
+          </label>
+          <div class="setting-static">
+            <span><b>遊戲伺服器</b><small id="settings-server-url">未設定（單機模式）</small></span>
+            <span class="server-pill" id="settings-server-state" role="status" aria-live="polite">單機</span>
+          </div>
+          <p class="settings-note" id="settings-server-note">這是單機遊戲，沒有伺服器也能完整遊玩；成績與進度都存在這台裝置上。</p>
+        </div>
       </div>
+
       <div class="settings-foot">
-        <button class="settings-reset" id="settings-reset" type="button">恢復預設</button>
-        <button class="settings-done" id="settings-done" type="button">完成</button>
+        <button class="btn3d small settings-reset" data-color="cream" id="settings-reset" type="button">↺ 恢復預設</button>
+        <button class="btn3d small settings-done" data-color="grape" id="settings-done" type="button">完成 ✓</button>
       </div>
     </section>
   </div>
-
 </div>
 
 <script src="js/config.js"></script>
@@ -301,6 +485,7 @@
 <script src="js/sudoku.js"></script>
 <script src="js/game.js"></script>
 <script src="js/storage.js"></script>
+<script src="js/online.js"></script>
 <script src="js/svgui.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/app.js"></script>

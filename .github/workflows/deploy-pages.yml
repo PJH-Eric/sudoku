@@ -26,7 +26,7 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      # 這是純單機遊戲，public/ 本身就能直接上線。
+      # public/ 本身就能直接上線；設定 GAME_SERVER_URL 後會啟用線上觀戰與留言。
       # server URL 不進版控：若 repository variable 有設定 GAME_SERVER_URL，
       # 就在部署當下注入 public/js/config.js；沒設定就維持單機模式。
       # 設定位置：Settings → Secrets and variables → Actions → Variables → GAME_SERVER_URL

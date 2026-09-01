@@ -95,6 +95,20 @@
   function hasSeenHelp() { return readJSON('sd_seen_help', false) === true; }
   function markHelpSeen() { writeJSON('sd_seen_help', true); }
 
+  /* ---------- 線上觀戰的訪客暱稱 ----------
+   * 不需要註冊，只是給房間裡的人叫得出名字用；正式的長度上限由伺服器再驗一次。 */
+  var NICK_MAX = 12;
+  function normalizeNick(v) {
+    if (typeof v !== 'string') return '';
+    var s = v.replace(/\s+/g, ' ').trim();
+    return s.length > NICK_MAX ? s.slice(0, NICK_MAX) : s;
+  }
+  function loadNick() {
+    var v = readJSON('sd_nick', '');
+    return normalizeNick(typeof v === 'string' ? v : '');
+  }
+  function saveNick(v) { return writeJSON('sd_nick', normalizeNick(v)); }
+
   /* ---------- 上次選的難度 ---------- */
   function loadLastDifficulty() {
     var v = readJSON(KEY_LAST, null);
@@ -110,6 +124,7 @@
     loadGame: loadGame, saveGame: saveGame, clearGame: clearGame,
     loadBest: loadBest, recordWin: recordWin, clearBest: clearBest,
     hasSeenHelp: hasSeenHelp, markHelpSeen: markHelpSeen,
+    NICK_MAX: NICK_MAX, normalizeNick: normalizeNick, loadNick: loadNick, saveNick: saveNick,
     loadLastDifficulty: loadLastDifficulty, saveLastDifficulty: saveLastDifficulty
   };
 })(typeof window !== 'undefined' ? window : globalThis);

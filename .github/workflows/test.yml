@@ -14,5 +14,6 @@ jobs:
         with:
           node-version: '20'
       - run: npm test
+      - run: npm run test:online
       - name: server URL 注入腳本可以正常執行
         run: node scripts/inject-server-url.js --clear

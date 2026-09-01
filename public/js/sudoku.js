@@ -659,6 +659,87 @@
     return humanSolve(grid, TIER.ADVANCED).tier;
   }
 
+  /* ---------- 解題路徑的量化描述 ----------
+   * 只看「最高用到第幾級技巧」是不夠的：那會讓一題困難有 95% 的過程跟普通一模一樣，
+   * 只在某兩三步卡一下。所以這裡把整條解題路徑拆開來算，難度改用這些數字定義：
+   *
+   *   steps          總步數（含只做消去、不填格的步驟）
+   *   byTier[t]      第 t 級技巧用了幾步
+   *   distinct[t]    第 t 級用到幾種不同的技巧名稱（例如區塊摒除、裸對算兩種）
+   *   singleRatio    第 1 級（唯一候選數）佔全部步驟的比例
+   *   firstHardAt    第一個非第 1 級步驟出現在路徑的哪個位置（0=一開始，1=最後）
+   *
+   * firstHardAt 是為了避免「前面一路順、最後才卡一下」——難度要貫穿整局，
+   * singleRatio 則是避免整題其實都是唯一候選數在推。 */
+  /* 「一眼就看得出來」的步驟比例：重播解題路徑，看有多少次填格時
+   * 那一格所在的某一列／行／宮已經只剩它一個空格。新手不必逐格數候選數就找得到，
+   * 所以新手入門難度會挑這個比例高的題目。 */
+  function obviousRatio(grid, steps) {
+    var g = grid.slice();
+    var placed = 0, obvious = 0;
+    for (var i = 0; i < steps.length; i++) {
+      var st = steps[i];
+      if (!st.placed) continue;
+      placed++;
+      var units = UNITS_OF[st.index];
+      for (var u = 0; u < units.length; u++) {
+        var unit = UNITS[units[u]];
+        var empty = 0;
+        for (var c = 0; c < 9; c++) if (!g[unit[c]]) empty++;
+        if (empty === 1) { obvious++; break; }
+      }
+      g[st.index] = st.digit;
+    }
+    return placed ? obvious / placed : 0;
+  }
+
+  function analyze(grid) {
+    var res = humanSolve(grid, TIER.ADVANCED, true);
+    var steps = res.steps || [];
+    var byTier = [0, 0, 0, 0, 0, 0];
+    var names = [null, {}, {}, {}, {}, {}];
+    var firstHard = -1;
+    for (var i = 0; i < steps.length; i++) {
+      var t = steps[i].tier;
+      byTier[t]++;
+      names[t][steps[i].technique] = true;
+      if (firstHard < 0 && t > TIER.SINGLE) firstHard = i;
+    }
+    var distinct = [0, 0, 0, 0, 0, 0];
+    for (var k = 1; k <= 5; k++) distinct[k] = Object.keys(names[k]).length;
+
+    /* stalls：玩家「卡住」幾次。
+     * 唯一候選數會連鎖，所以任何題目的 T1 步數都會很多，單看比例分不出難度。
+     * 真正決定體感的是「推不下去、必須改用高階技巧」發生了幾次，
+     * 以及這些卡點有沒有分散在整局（spread：路徑三等分裡有幾段出現過卡點）。 */
+    var stalls = 0, inStall = false;
+    var spreadHit = [false, false, false];
+    for (i = 0; i < steps.length; i++) {
+      var hard = steps[i].tier > TIER.SINGLE;
+      if (hard && !inStall) stalls++;
+      inStall = hard;
+      if (hard && steps.length) {
+        var third = Math.min(2, Math.floor((i / steps.length) * 3));
+        spreadHit[third] = true;
+      }
+    }
+    var spread = (spreadHit[0] ? 1 : 0) + (spreadHit[1] ? 1 : 0) + (spreadHit[2] ? 1 : 0);
+    var maxTier = TIER.SINGLE;
+    for (k = 5; k >= 1; k--) { if (byTier[k]) { maxTier = k; break; } }
+    return {
+      solved: res.solved,
+      steps: steps.length,
+      byTier: byTier,
+      distinct: distinct,
+      maxTier: res.solved ? maxTier : TIER.GUESS,
+      singleRatio: steps.length ? byTier[TIER.SINGLE] / steps.length : 1,
+      firstHardAt: firstHard < 0 ? 1 : (steps.length > 1 ? firstHard / (steps.length - 1) : 0),
+      stalls: stalls,
+      spread: spread,
+      obviousRatio: obviousRatio(grid, steps)
+    };
+  }
+
   /* 提示：回傳下一個可以「填入數字」的邏輯步驟。
    * 若純邏輯無法推進（需要試誤），而且有提供答案，就直接揭示一格。 */
   function nextStep(grid, solution) {
@@ -686,8 +767,9 @@
       for (var i = 0; i < CELLS; i++) {
         if (!grid[i]) {
           return {
-            tier: TIER.GUESS, technique: '直接揭示', index: i, digit: solution[i], placed: true, viaTier: TIER.GUESS,
-            reason: cellName(i) + ' 已經超出一般技巧能推出的範圍，直接告訴你答案是 ' + solution[i] + '。'
+            tier: TIER.GUESS, technique: '這裡邏輯推不下去', index: i, digit: solution[i], placed: true, viaTier: TIER.GUESS,
+            reason: '到這裡為止，唯一候選數、隱藏唯一數、區塊摒除、裸對、裸三、隱藏對與 X-Wing 都推不出下一格了，' +
+              '這種局面只能靠假設與試誤。先幫你把 ' + cellName(i) + ' 填成 ' + solution[i] + '，讓你接得下去。'
           };
         }
       }
@@ -696,29 +778,95 @@
   }
 
   /* ---------- 出題：挖洞 ---------- */
-  var DIFFICULTIES = ['easy', 'medium', 'hard', 'expert'];
-  /* 難度＝「所需技巧等級」＋「提示數上限」兩件事一起控制：
-   *   maxTier      挖洞過程中允許用到的最高技巧（超過就不挖，確保題目不會太難）
-   *   minTier      題目至少要用到的技巧（不到就繼續挖／換一組重來，確保題目不會太簡單）
-   *   targetGivens 提示數挖到這個數量以下才算達標
-   *   minGivens    絕不挖到比這更少，避免同一難度差太多 */
+  var DIFFICULTIES = ['beginner', 'easy', 'medium', 'hard', 'expert'];
+  /* 難度用「提示數區間」＋「解題路徑的量化門檻」兩件事一起定義。
+   * 提示數區間之間刻意留空隙，不重疊，光看盤面就能感覺到差別：
+   *
+   *   難度       提示數   路徑門檻
+   *   新手入門   48–55   全程只需要唯一候選數，且過半步驟是「整列／行／宮只剩一格」
+   *   簡單       40–45   全程只需要唯一候選數
+   *   普通       32–36   至少 6 步隱藏唯一數，且完全不需要第 3 級技巧
+   *   困難       26–30   至少 5 步第 3 級以上，且用到至少 2 種不同的第 3 級技巧，唯一候選數不超過 65%
+   *   專家       22–25   至少 3 步第 4 級（裸三／隱藏對／X-Wing），唯一候選數不超過 45%
+   *
+   * 三個難度都要求「第一個非唯一候選數的步驟落在路徑前 30% 以內」，
+   * 避免出現「前面一路順推、最後才卡一下」這種難度不貫穿整局的題目。
+   *
+   *   digTier    挖洞過程中允許用到的最高技巧（決定題目一定解得出來）
+   *   givensMin  絕不挖到比這更少
+   *   givensMax  挖到這個數量以下才開始檢查是否達標
+   *   accept     解題路徑要滿足的量化門檻 */
+  var EARLY_LIMIT = 0.30;      // 第一個非唯一候選數的步驟要落在路徑前 30% 以內
+  var OBVIOUS_MIN = 0.55;      // 新手入門：一眼可見的步驟至少要佔一半以上
+
   var PRESETS = {
-    easy:   { label: '簡單', maxTier: TIER.SINGLE,   minTier: TIER.SINGLE,   targetGivens: 42, minGivens: 36, symmetry: true,  attempts: 8 },
-    medium: { label: '普通', maxTier: TIER.HIDDEN,   minTier: TIER.HIDDEN,   targetGivens: 34, minGivens: 28, symmetry: true,  attempts: 12 },
-    hard:   { label: '困難', maxTier: TIER.ADVANCED, minTier: TIER.LOCKED,   targetGivens: 32, minGivens: 23, symmetry: true,  attempts: 48 },
-    expert: { label: '專家', maxTier: TIER.GUESS,    minTier: TIER.GUESS,    targetGivens: 26, minGivens: 20, symmetry: false, attempts: 20 }
+    beginner: {
+      label: '新手入門', digTier: TIER.SINGLE, givensMin: 48, givensMax: 55, symmetry: true, attempts: 14,
+      accept: function (a) {
+        return a.solved && a.maxTier === TIER.SINGLE && a.obviousRatio >= OBVIOUS_MIN;
+      }
+    },
+    easy: {
+      label: '簡單', digTier: TIER.SINGLE, givensMin: 40, givensMax: 45, symmetry: true, attempts: 12,
+      accept: function (a) { return a.solved && a.maxTier === TIER.SINGLE; }
+    },
+    medium: {
+      label: '普通', digTier: TIER.HIDDEN, givensMin: 32, givensMax: 36, symmetry: true, attempts: 120,
+      accept: function (a) {
+        return a.solved && a.maxTier === TIER.HIDDEN &&
+          a.byTier[TIER.HIDDEN] >= 6 &&
+          a.byTier[TIER.LOCKED] === 0 && a.byTier[TIER.ADVANCED] === 0 &&
+          a.stalls >= 3 && a.spread >= 2 &&
+          a.firstHardAt <= EARLY_LIMIT;
+      }
+    },
+    hard: {
+      label: '困難', digTier: TIER.ADVANCED, givensMin: 26, givensMax: 30, symmetry: true, attempts: 220,
+      accept: function (a) {
+        return a.solved &&
+          a.byTier[TIER.LOCKED] + a.byTier[TIER.ADVANCED] >= 3 &&
+          /* 兩種以上的第 3 級技巧，或同一種但用得夠多次 */
+          (a.distinct[TIER.LOCKED] >= 2 || a.byTier[TIER.LOCKED] + a.byTier[TIER.ADVANCED] >= 6) &&
+          a.stalls >= 3 && a.spread >= 2 &&
+          a.firstHardAt <= EARLY_LIMIT;
+      }
+    },
+    expert: {
+      label: '專家', digTier: TIER.ADVANCED, givensMin: 21, givensMax: 25, symmetry: false, attempts: 300,
+      accept: function (a) {
+        return a.solved &&
+          a.byTier[TIER.LOCKED] + a.byTier[TIER.ADVANCED] >= 6 &&
+          a.distinct[TIER.LOCKED] >= 2 &&
+          a.stalls >= 3 && a.spread >= 2 &&
+          a.firstHardAt <= EARLY_LIMIT;
+      }
+    }
   };
 
+  /* 沒有任何一次嘗試達標時，要從備案裡挑「最接近目標」的那一份，
+   * 而不是隨便回一題。分數把高階步數、卡點次數與卡點分散度都算進去。 */
+  function hardnessScore(info, givens) {
+    if (!info) return -1;
+    return (info.byTier[TIER.HIDDEN] || 0) * 0.5 +
+      (info.byTier[TIER.LOCKED] || 0) * 3 +
+      (info.byTier[TIER.ADVANCED] || 0) * 5 +
+      (info.distinct[TIER.LOCKED] || 0) * 2 +
+      (info.stalls || 0) * 1.5 +
+      (info.spread || 0) * 2 -
+      givens * 0.15;
+  }
+
   /* 依序嘗試挖洞：
-   * 1. 只有在「仍是唯一解」且「不超過允許技巧上限」時才真的挖掉。
-   * 2. 挖到目標提示數之後，如果難度還沒到下限，就繼續挖，直到達標或沒得挖。 */
+   * 1. 只有在「仍是唯一解」且「用允許的技巧仍解得出來」時才真的挖掉。
+   * 2. 一旦挖進提示數區間，就用 accept() 檢查解題路徑；達標就停，不然繼續挖。
+   * 3. 挖不到 givensMin 以下，避免同一難度的題目落差太大。 */
   function dig(solution, rng, preset) {
     var grid = solution.slice();
     var order = [];
     for (var i = 0; i < CELLS; i++) order.push(i);
     if (w.RNG) w.RNG.shuffle(order, rng);
     var givens = CELLS;
-    var tier = TIER.SINGLE;
+    var info = null;
 
     for (var k = 0; k < order.length; k++) {
       var a = order[k];
@@ -728,34 +876,32 @@
         var b = CELLS - 1 - a;
         if (b !== a && grid[b]) group.push(b);
       }
-      if (givens - group.length < preset.minGivens) continue;
+      if (givens - group.length < preset.givensMin) continue;
 
       var backup = [];
       var t;
       for (t = 0; t < group.length; t++) { backup.push(grid[group[t]]); grid[group[t]] = 0; }
 
       var ok = countSolutions(grid, 2).count === 1;
-      if (ok && preset.maxTier < TIER.GUESS) {
-        ok = humanSolve(grid, preset.maxTier).solved;
-      }
+      if (ok) ok = humanSolve(grid, preset.digTier).solved;
       if (!ok) {
         for (t = 0; t < group.length; t++) grid[group[t]] = backup[t];
         continue;
       }
       givens -= group.length;
-      if (givens <= preset.targetGivens) {
-        tier = grade(grid);
-        if (tier >= preset.minTier) break;
+      if (givens <= preset.givensMax) {
+        info = analyze(grid);
+        if (preset.accept(info)) break;
       }
     }
-    if (givens > preset.targetGivens || tier < preset.minTier) tier = grade(grid);
-    return { grid: grid, givens: givens, tier: tier };
+    if (!info) info = analyze(grid);
+    return { grid: grid, givens: givens, tier: info.maxTier, info: info, accepted: givens <= preset.givensMax && preset.accept(info) };
   }
 
   /* 產生一題。傳入相同的 seed 與 difficulty 一定得到同一題。 */
   function generatePuzzle(options) {
     var opts = options || {};
-    var difficulty = PRESETS[opts.difficulty] ? opts.difficulty : 'easy';
+    var difficulty = PRESETS[opts.difficulty] ? opts.difficulty : 'beginner';
     var preset = PRESETS[difficulty];
     var seed = (opts.seed === undefined || opts.seed === null || opts.seed === '')
       ? (w.RNG ? w.RNG.randomSeed() : String(Date.now()))
@@ -773,13 +919,16 @@
         givens: res.givens,
         tier: res.tier,
         technique: TIER_NAMES[res.tier],
+        profile: res.info,
         difficulty: difficulty,
         label: preset.label,
         seed: String(seed),
         attempts: attempt + 1
       };
-      if (res.tier >= preset.minTier && res.givens <= preset.targetGivens) return candidate;
-      if (!best || res.tier > best.tier || (res.tier === best.tier && res.givens < best.givens)) best = candidate;
+      if (res.accepted) return candidate;
+      /* 沒達標就留著當備案：挑分數最高（最接近這個難度該有的樣子）的那一份 */
+      candidate.score = hardnessScore(res.info, res.givens);
+      if (!best || candidate.score > best.score) best = candidate;
     }
     return best;
   }
@@ -796,7 +945,7 @@
     candidates: candidates, buildCandidates: buildCandidates,
     countSolutions: countSolutions, solve: solve, hasUniqueSolution: hasUniqueSolution,
     generateSolution: generateSolution,
-    humanSolve: humanSolve, grade: grade, nextStep: nextStep,
+    humanSolve: humanSolve, grade: grade, analyze: analyze, nextStep: nextStep,
     dig: dig, generatePuzzle: generatePuzzle
   };
 })(typeof window !== 'undefined' ? window : globalThis);

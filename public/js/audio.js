@@ -10,7 +10,7 @@
   'use strict';
 
   var ctx = null, master = null, musicGain = null, sfxGain = null;
-  var musicOn = true, sfxOn = true, musicVolume = 0.7, sfxVolume = 1, hapticOn = true;
+  var musicOn = true, sfxOn = true, musicVolume = 0.7, sfxVolume = 1, hapticOn = true, chatCueOn = true;
   var timer = null, step = 0, nextTime = 0, curTrack = 'menu';
   var TEMPO = 84;                        // BPM，慢一點比較適合動腦
   var STEP = 15 / TEMPO;                 // 十六分音符秒數
@@ -18,7 +18,7 @@
   var KEY = {
     music: 'sd_music', sfx: 'sd_sfx',
     musicVol: 'sd_music_volume', sfxVol: 'sd_sfx_volume',
-    haptic: 'sd_haptic'
+    haptic: 'sd_haptic', chatCue: 'sd_chat_cue'
   };
 
   function loadFlag(k, d) {
@@ -38,6 +38,7 @@
   musicVolume = loadVolume(KEY.musicVol, 0.7);
   sfxVolume = loadVolume(KEY.sfxVol, 1);
   hapticOn = loadFlag(KEY.haptic, true);
+  chatCueOn = loadFlag(KEY.chatCue, true);
 
   function applyGain() {
     if (musicGain) musicGain.gain.value = musicOn ? 0.13 * musicVolume : 0;
@@ -137,6 +138,18 @@
     start: function (t) {
       tone({ t: t, f: 320, f2: 1100, dur: 0.3, type: 'triangle', v: 0.28 });
       noise({ t: t, f: 1800, dur: 0.26, v: 0.08 });
+    },
+    /* 線上觀戰用：新訊息、有人加入房間、房間關閉 */
+    chat: function (t) {
+      tone({ t: t, f: hz(84), dur: 0.1, type: 'sine', v: 0.24 });
+      tone({ t: t + 0.06, f: hz(88), dur: 0.12, type: 'sine', v: 0.2 });
+    },
+    join: function (t) {
+      tone({ t: t, f: hz(72), dur: 0.14, type: 'triangle', v: 0.26 });
+      tone({ t: t + 0.08, f: hz(79), dur: 0.18, type: 'triangle', v: 0.22 });
+    },
+    leave: function (t) {
+      tone({ t: t, f: hz(79), f2: hz(67), dur: 0.26, type: 'sine', v: 0.24 });
     }
   };
 
@@ -218,6 +231,13 @@
     hapticOn = !!on; saveFlag(KEY.haptic, hapticOn);
     return hapticOn;
   }
+  /* 聊天提示音是獨立開關，但仍然受「遊戲音效」總開關管：音效關掉就一律不出聲 */
+  function setChatCue(on) {
+    chatCueOn = !!on; saveFlag(KEY.chatCue, chatCueOn);
+    if (chatCueOn) play('chat');
+    return chatCueOn;
+  }
+  function playChat() { if (chatCueOn) play('chat'); }
   function vibrate(pattern) {
     if (!hapticOn || !w.navigator || typeof w.navigator.vibrate !== 'function') return;
     /* 使用者還沒真的碰過畫面時呼叫 vibrate，瀏覽器會擋下並在主控台留下警告，先跳過 */
@@ -240,13 +260,16 @@
     setMusic: setMusic, setSfx: setSfx,
     setMusicVolume: setMusicVolume, setSfxVolume: setSfxVolume,
     setHaptic: setHaptic, vibrate: vibrate,
+    setChatCue: setChatCue, playChat: playChat,
     isMusicOn: function () { return musicOn; },
     isSfxOn: function () { return sfxOn; },
     getMusicVolume: function () { return musicVolume; },
     getSfxVolume: function () { return sfxVolume; },
     isHapticOn: function () { return hapticOn; },
+    isChatCueOn: function () { return chatCueOn; },
     resetDefaults: function () {
       setMusic(true); setSfx(true); setMusicVolume(0.7); setSfxVolume(1); setHaptic(true);
+      chatCueOn = true; saveFlag(KEY.chatCue, true);
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

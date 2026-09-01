@@ -27,10 +27,10 @@
   var pauseLastFocus = null;
   var cells = [];
   var padButtons = [];
-  var pendingDifficulty = w.Store.loadLastDifficulty() || 'easy';
+  var pendingDifficulty = w.Store.loadLastDifficulty() || 'beginner';
   var tutStep = 0;
 
-  var DIFF_LABEL = { easy: '簡單', medium: '普通', hard: '困難', expert: '專家' };
+  var DIFF_LABEL = { beginner: '新手入門', easy: '簡單', medium: '普通', hard: '困難', expert: '專家' };
 
   /* ---------- 純文字教學 ---------- */
   var TUTORIAL = [
@@ -88,9 +88,10 @@
     {
       title: '難度、種子與設定',
       body: [
-        '四種難度不是只有空格數量不同，而是「解得下去所需要的技巧」不同：簡單只要「這格只剩一個數字可填」；普通要找「這一宮只有這格放得下 X」；困難需要區塊摒除、裸對這類先刪候選數的技巧；專家連基本技巧都推不完，得靠假設試誤。',
+        '五種難度不是只有空格數量不同，而是「解得下去所需要的技巧」與「會卡住幾次」都不同：新手入門大多是「整列或整宮只剩一格」，一眼就看得到；簡單全程只要「這格只剩一個數字可填」；普通會卡住好幾次，要找「這一宮只有這格放得下 X」；困難整局都要用區塊摒除、裸對先刪候選數；專家的盤面不對稱、卡點更多更早，還可能用到裸三或 X-Wing。',
         '出題畫面可以輸入「種子」。同一組種子加上同一個難度，永遠會拿到同一題，可以跟朋友比同一題誰快。',
-        '右上角的 ⚙ 在每個畫面都在，可以分別調整背景音樂與音效的開關和音量、觸控震動、動畫、以及盤面要不要幫你標示與高亮。',
+        '右上角的 ⚙ 在每個畫面都在，可以分別調整背景音樂與音效的開關和音量、留言提示音、觸控震動、動畫、暱稱，以及盤面要不要幫你標示與高亮。',
+        '主選單的「線上觀戰與留言」可以看別人解題、順便聊天；也可以自己開一間房，把連結傳給朋友讓他們進來看你解。這需要有設定遊戲伺服器，沒有設定時畫面會直接說明原因。',
         '離開遊戲不用擔心：目前這一題會存在這台裝置上，下次回來主選單按「繼續上一題」就能接著玩。'
       ]
     }
@@ -124,14 +125,17 @@
   /* ---------- 畫面切換 ---------- */
   function go(id) {
     if (cur === 's-game' && id !== 's-game') stopTimer();
+    if (cur === 's-lobby' && id !== 's-lobby') stopLobbyAuto();
     qa('.screen').forEach(function (s) { s.classList.toggle('active', s.id === id); });
     cur = id;
-    w.Sound.setTrack(id === 's-game' ? 'game' : 'menu');
+    w.Sound.setTrack((id === 's-game' || id === 's-watch') ? 'game' : 'menu');
     if (id === 's-game') {
       setTimeout(resizeBoard, 40);
       if (!paused) startTimer();
     }
+    if (id === 's-watch') setTimeout(resizeWatchBoard, 40);
     if (id === 's-stats') renderStats();
+    if (id === 's-lobby') renderLobby();
     if (id === 's-home') refreshHome();
     setTimeout(function () { w.UI.repaintAll(q(id)); }, 30);
   }
@@ -173,6 +177,32 @@
   }
 
   /* ---------- 盤面建立 ---------- */
+  function appendSharedNoteChrome(cell) {
+    var corner = D.createElement('span');
+    corner.className = 'cell-note-corner';
+    corner.setAttribute('role', 'button');
+    corner.setAttribute('tabindex', '-1');
+    corner.setAttribute('aria-label', '查看這格的共享備註');
+    var count = D.createElement('span');
+    count.className = 'cell-note-count';
+    corner.appendChild(count);
+
+    var popover = D.createElement('span');
+    popover.className = 'cell-note-popover';
+    popover.hidden = true;
+    popover.setAttribute('role', 'status');
+    var title = D.createElement('b');
+    title.className = 'cell-note-popover-title';
+    title.textContent = '共享備註';
+    var items = D.createElement('span');
+    items.className = 'cell-note-items';
+    popover.appendChild(title);
+    popover.appendChild(items);
+
+    cell.appendChild(corner);
+    cell.appendChild(popover);
+  }
+
   function buildBoard() {
     var board = q('board');
     board.innerHTML = '';
@@ -181,7 +211,8 @@
       var r = S.ROW_OF[i], c = S.COL_OF[i];
       var btn = D.createElement('button');
       btn.type = 'button';
-      btn.className = 'cell' + ((c === 2 || c === 5) ? ' br' : '') + ((r === 2 || r === 5) ? ' bb' : '');
+      btn.className = 'cell' + ((c === 2 || c === 5) ? ' br' : '') + ((r === 2 || r === 5) ? ' bb' : '') +
+        (c >= 7 ? ' note-right' : '') + (r >= 7 ? ' note-bottom' : '');
       btn.setAttribute('data-i', String(i));
       btn.setAttribute('role', 'gridcell');
       btn.tabIndex = -1;
@@ -194,10 +225,18 @@
       }
       btn.appendChild(v);
       btn.appendChild(nt);
+      appendSharedNoteChrome(btn);
       board.appendChild(btn);
       cells.push(btn);
     }
     board.addEventListener('click', function (e) {
+      var noteToggle = e.target.closest ? e.target.closest('.cell-note-corner') : null;
+      if (noteToggle) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleHostCellNotes(parseInt(noteToggle.parentNode.getAttribute('data-i'), 10));
+        return;
+      }
       var target = e.target.closest ? e.target.closest('.cell') : null;
       if (!target) return;
       selectCell(parseInt(target.getAttribute('data-i'), 10), true);
@@ -243,6 +282,8 @@
       var cls = 'cell';
       if (S.COL_OF[i] === 2 || S.COL_OF[i] === 5) cls += ' br';
       if (S.ROW_OF[i] === 2 || S.ROW_OF[i] === 5) cls += ' bb';
+      if (S.COL_OF[i] >= 7) cls += ' note-right';
+      if (S.ROW_OF[i] >= 7) cls += ' note-bottom';
       if (state.given[i]) cls += ' given';
       if (i === selected) cls += ' sel';
       else if (options.highlightUnits && selected >= 0 &&
@@ -253,17 +294,29 @@
       el.className = cls;
       el.tabIndex = (i === selected) ? 0 : -1;
 
-      var value = el.firstChild;
+      var value = el.querySelector('.v');
       value.textContent = v ? String(v) : '';
-      var notes = el.lastChild;
+      var notes = el.querySelector('.nt');
       var mask = v ? 0 : state.notes[i];
       notes.style.display = mask ? '' : 'none';
       for (var d = 1; d <= 9; d++) {
         notes.childNodes[d - 1].className = (mask & S.BIT[d]) ? 'on' : '';
       }
-      el.setAttribute('aria-label', cellLabel(i, v, mask, conflicts[i], wrong && wrong[i]));
+      renderCellNotes(el, host, i, hostNoteOpenIndex === i);
+      var shared = notesFor(host, i);
+      el.setAttribute('aria-label', cellLabel(i, v, mask, conflicts[i], wrong && wrong[i]) +
+        (shared.length ? '，有 ' + shared.length + ' 則共享備註' : ''));
     }
     renderStatus();
+  }
+
+  function toggleHostCellNotes(index) {
+    if (index < 0 || index >= 81) return;
+    selected = index;
+    hostNoteOpenIndex = hostNoteOpenIndex === index ? -1 : index;
+    renderBoard();
+    if (cells[index]) cells[index].focus({ preventScroll: true });
+    pushHostState();
   }
 
   function cellLabel(i, v, mask, conflict, isWrong) {
@@ -303,15 +356,18 @@
   }
 
   /* ---------- 盤面尺寸（RWD 的關鍵） ---------- */
-  function resizeBoard() {
-    var wrap = q('boardwrap') || D.querySelector('.boardwrap');
-    var board = q('board');
-    if (!wrap || !board) return;
+  function resizeBoardIn(screenId, boardId) {
+    var screen = q(screenId);
+    var board = q(boardId);
+    if (!screen || !board) return;
+    var wrap = screen.querySelector('.boardwrap');
+    if (!wrap) return;
     var w1 = wrap.clientWidth, h1 = wrap.clientHeight;
     if (!w1 || !h1) return;
     var size = Math.max(180, Math.floor(Math.min(w1, h1)) - 2);
     board.style.setProperty('--bs', size + 'px');
   }
+  function resizeBoard() { resizeBoardIn('s-game', 'board'); }
 
   /* ---------- 選格 ---------- */
   function selectCell(index, fromUser) {
@@ -320,6 +376,7 @@
     renderBoard();
     if (cells[index]) cells[index].focus({ preventScroll: true });
     if (fromUser) w.Sound.play('select');
+    pushHostState();
   }
 
   function moveSelection(dr, dc) {
@@ -347,6 +404,7 @@
     }
     renderBoard();
     scheduleSave();
+    pushHostState();
     if (res.won) {
       finishGame();
       return res;
@@ -463,6 +521,11 @@
 
   /* ---------- 出題流程 ---------- */
   function startNewGame(difficulty, seed) {
+    if (host) {
+      /* 一間房綁一題：換題目就換一間房，避免觀戰者看到的題目突然變掉 */
+      endHostRoom(true);
+      hostMode = true;
+    }
     pendingDifficulty = difficulty;
     w.Store.saveLastDifficulty(difficulty);
     q('loading-note').textContent = '正在為「' + (DIFF_LABEL[difficulty] || difficulty) + '」挖洞並驗證唯一解…';
@@ -482,6 +545,7 @@
       }
       state = G.fromPuzzle(puzzle, { autoClearNotes: options.autoClearNotes });
       beginGame(true);
+      if (hostMode) openRoom();
     }, 40);
   }
 
@@ -533,10 +597,12 @@
       w.Sound.play('pause');
       setTimeout(function () { q('pause-box').focus(); }, 20);
       say('遊戲已暫停，計時停住了。', 'good');
+      pushHostState();
     } else {
       startTimer();
       w.Sound.play('resume');
       say('繼續囉！', 'good');
+      pushHostState();
       if (pauseLastFocus && pauseLastFocus.focus) pauseLastFocus.focus();
       pauseLastFocus = null;
     }
@@ -602,6 +668,1034 @@
     setTimeout(function () { w.UI.repaintAll(q('s-help')); }, 10);
   }
 
+  /* ============================================================
+   * 線上觀戰與留言
+   *
+   * 角色只有兩種，權限差很多：
+   *   主持人（host）：照常解題，盤面會被推送出去；可以分享／換連結、關房。
+   *   觀戰者（watch）：只收盤面、共享格子備註與聊天室；不能填數字、不能用提示、不能改房間設定。
+   *
+   * 盤面資料一律走 SudokuGame.spectatorSnapshot / spectatorView，
+   * 衝突、剩餘數量都由觀戰端用同一份 sudoku.js 算，規則核心沒有第二套。
+   * ========================================================== */
+
+  var host = null;         // 開房中：{ code, token, invite, viewers }
+  var watch = null;        // 觀戰中：{ code, invite, view, meta, viewers, cellNotes, selected }
+  var hostMode = false;    // 難度選擇畫面是否為「開房模式」
+  var nick = w.Store.loadNick();
+  var watchCells = [];
+  var watchTimer = null;
+  var watchClock = null;
+  var hostNoteOpenIndex = -1;
+  var watchNoteOpenIndex = -1;
+  var lobbyTimer = null;
+  var chatOpen = false;
+  var chatUnread = 0;
+  var chatSeen = {};
+  var chatLastFocus = null;
+  var lastWatchValues = '';
+
+  var CONN_TEXT = {
+    idle: '尚未連線',
+    connecting: '連線中…',
+    waking: '伺服器喚醒中…（免費方案冷啟動要十幾秒）',
+    open: '已連線',
+    retrying: '連線中斷，重試中…',
+    failed: '連不上伺服器',
+    closed: '房間已關閉'
+  };
+
+  function nickOrDefault() { return nick || '路過的觀眾'; }
+
+  /* ---------- 大廳 ---------- */
+  function setLobbyState(kind, text) {
+    var el = q('lobby-state');
+    if (!el) return;
+    el.textContent = text;
+    el.setAttribute('data-state', kind);
+  }
+
+  function renderLobby() {
+    var on = w.Online.isEnabled();
+    q('lobby-off').hidden = on;
+    q('lobby-live').hidden = !on;
+    if (!on) {
+      q('lobby-off-note').textContent = w.Online.disabledReason();
+      stopLobbyAuto();
+      return;
+    }
+    q('lobby-nick').value = nick;
+    refreshLobby();
+    startLobbyAuto();
+  }
+
+  function startLobbyAuto() {
+    stopLobbyAuto();
+    lobbyTimer = setInterval(function () {
+      if (cur === 's-lobby' && w.Online.isEnabled()) refreshLobby(true);
+    }, 12000);
+  }
+  function stopLobbyAuto() {
+    if (lobbyTimer) { clearInterval(lobbyTimer); lobbyTimer = null; }
+  }
+
+  function refreshLobby(quiet) {
+    if (!w.Online.isEnabled()) return;
+    if (!quiet) setLobbyState('loading', '正在讀取房間列表…');
+    w.Online.listRooms(function (err, data) {
+      if (cur !== 's-lobby') return;
+      if (err) {
+        setLobbyState('error', err.message);
+        renderRooms(null);
+        return;
+      }
+      renderRooms(data.rooms);
+      setLobbyState('ok', '目前有 ' + data.rooms.length + ' 間房間（伺服器上限 ' + data.maxRooms + ' 間）。');
+    }, function () {
+      if (cur === 's-lobby') setLobbyState('waking', '伺服器好像在睡覺，正在喚醒…免費方案冷啟動大約要十幾秒，請稍等。');
+    });
+  }
+
+  /* 房間卡片一律用 textContent 塞入使用者資料（暱稱由別人輸入，絕不能碰 innerHTML） */
+  function renderRooms(rooms) {
+    var host2 = q('roomlist');
+    host2.innerHTML = '';
+    if (rooms === null) {
+      var fail = D.createElement('div');
+      fail.className = 'rooms-empty';
+      fail.textContent = '暫時拿不到房間列表。可以按上面的「重新整理」再試一次，或直接輸入房號加入。';
+      host2.appendChild(fail);
+      return;
+    }
+    if (!rooms.length) {
+      var empty = D.createElement('div');
+      empty.className = 'rooms-empty';
+      empty.textContent = '現在沒有人開房。你可以按「開一間房來解題」，讓別人進來看你解題兼聊天。';
+      host2.appendChild(empty);
+      return;
+    }
+    rooms.forEach(function (room) {
+      host2.appendChild(roomCard(room));
+    });
+  }
+
+  function roomCard(room) {
+    var card = D.createElement('button');
+    card.type = 'button';
+    card.className = 'roomcard';
+    card.setAttribute('data-code', room.code);
+
+    var code = D.createElement('span');
+    code.className = 'rc-code';
+    code.textContent = room.code;
+
+    var main = D.createElement('span');
+    main.className = 'rc-main';
+    var who = D.createElement('span');
+    who.className = 'rc-host';
+    who.textContent = room.hostName;
+    var meta = D.createElement('span');
+    meta.className = 'rc-meta';
+
+    function tag(text, cls) {
+      var t = D.createElement('span');
+      t.className = 'rc-tag' + (cls ? ' ' + cls : '');
+      t.textContent = text;
+      meta.appendChild(t);
+    }
+    tag(room.label || room.difficulty || '難度未知');
+    tag(room.status === 'done' ? '已完成' : '進行中', room.status === 'done' ? 'done' : 'live');
+    if (!room.hostOnline) tag('主持人離線中', 'off');
+    tag('👀 ' + room.viewers + ' / ' + room.maxViewers);
+    tag('已填 ' + room.filled + ' / ' + room.total);
+    tag('⏱ ' + fmtTime(room.elapsedMs));
+    tag('開房 ' + agoText(room.createdAt));
+
+    main.appendChild(who);
+    main.appendChild(meta);
+
+    var go2 = D.createElement('span');
+    go2.className = 'rc-go';
+    go2.textContent = room.viewers >= room.maxViewers ? '已滿' : '進去看 ▶';
+
+    var bar = D.createElement('span');
+    bar.className = 'rc-bar';
+    var fill = D.createElement('i');
+    fill.style.width = Math.round((room.total ? room.filled / room.total : 0) * 100) + '%';
+    bar.appendChild(fill);
+
+    card.appendChild(code);
+    card.appendChild(main);
+    card.appendChild(go2);
+    card.appendChild(bar);
+    card.setAttribute('aria-label',
+      '房號 ' + room.code + '，主持人 ' + room.hostName + '，' + (room.label || '') +
+      '，' + (room.status === 'done' ? '已完成' : '進行中') +
+      '，已填 ' + room.filled + ' 格，共 ' + room.viewers + ' 人觀戰');
+    card.addEventListener('click', function () {
+      w.Sound.play('click');
+      joinRoom(room.code, '');
+    });
+    return card;
+  }
+
+  function agoText(at) {
+    var sec = Math.max(0, Math.round((Date.now() - at) / 1000));
+    if (sec < 60) return sec + ' 秒前';
+    if (sec < 3600) return Math.round(sec / 60) + ' 分鐘前';
+    return Math.round(sec / 3600) + ' 小時前';
+  }
+
+  /* ---------- 開房（主持人） ---------- */
+  function setHostConn(kind, text) {
+    var el = q('h-conn');
+    if (!el) return;
+    el.textContent = text || CONN_TEXT[kind] || kind;
+    el.setAttribute('data-state', kind);
+  }
+
+  function hostSnapshot() {
+    if (!state) return null;
+    return G.spectatorSnapshot(state, { selected: selected, paused: paused });
+  }
+
+  function onHostState(data) {
+    if (!host || !data) return;
+    host.cellNotes = normalizeCellNotes(data.cellNotes);
+    if (state) renderBoard();
+  }
+
+  function onSharedNote(data) {
+    if (!data || data.index < 0 || data.index >= 81) return;
+    var list = normalizeCellNoteList(data.notes);
+    if (host) {
+      host.cellNotes[data.index] = list;
+      if (state) renderBoard();
+    }
+    if (watch) {
+      watch.cellNotes[data.index] = list;
+      renderWatchBoard();
+    }
+  }
+
+  function pushHostState() {
+    if (!host) return;
+    var snap = hostSnapshot();
+    if (snap) w.Online.pushState(snap);
+  }
+
+  function openRoom() {
+    if (!state) return;
+    if (!w.Online.isEnabled()) {
+      hostMode = false;
+      toast('目前是單機模式，沒辦法開房。');
+      say(w.Online.disabledReason(), 'bad');
+      return;
+    }
+    q('hostbar').hidden = false;
+    q('h-code').textContent = '開房中…';
+    q('h-viewers').textContent = '👀 0 人觀戰';
+    setHostConn('connecting', '開房中…');
+    setChatEnabled(false);
+
+    w.Online.createRoom({
+      hostName: nickOrDefault(),
+      difficulty: state.difficulty,
+      label: state.label,
+      technique: state.technique,
+      seed: state.seed,
+      snapshot: hostSnapshot()
+    }, function (err, data) {
+      if (err) {
+        host = null;
+        hostMode = false;
+        q('hostbar').hidden = true;
+        setChatVisible(false);
+        say('開房失敗：' + err.message, 'bad');
+        toast('開房失敗');
+        return;
+      }
+      host = {
+        code: data.code, token: data.hostToken, invite: data.inviteToken, viewers: 0,
+        cellNotes: normalizeCellNotes()
+      };
+      q('h-code').textContent = '房號 ' + host.code;
+      resetChat('房號 ' + host.code + '（你是主持人）');
+      setChatVisible(true);
+      w.Sound.play('join');
+      say('房間開好了！房號 ' + host.code + '，按「分享連結」把它傳給朋友，他們就能進來看你解題。', 'good');
+      toast('房號 ' + host.code);
+
+      w.Online.connect({
+        code: host.code,
+        token: host.token,
+        on: {
+          state: onHostState,
+          note: onSharedNote,
+          status: function (st, detail) {
+            setHostConn(st, CONN_TEXT[st] + (detail && st === 'retrying' ? '（' + detail + '）' : ''));
+            setChatEnabled(st === 'open');
+          },
+          presence: function (p) {
+            if (!host) return;
+            var before = host.viewers;
+            host.viewers = p.viewers;
+            q('h-viewers').textContent = '👀 ' + p.viewers + ' 人觀戰';
+            if (p.viewers > before) {
+              systemChat('有人進來觀戰了，目前 ' + p.viewers + ' 人。');
+              w.Sound.playChat();
+            } else if (p.viewers < before) {
+              systemChat('有人離開了，目前 ' + p.viewers + ' 人。');
+            }
+          },
+          chat: onChatMessage,
+          closed: function () {
+            systemChat('房間已經關閉。');
+            endHostRoom(false);
+          }
+        }
+      });
+      w.Online.startStatePush(hostSnapshot);
+      pushHostState();
+    }, function () {
+      setHostConn('waking', CONN_TEXT.waking);
+    });
+  }
+
+  /* 結束開房。announce=true 代表主動通知伺服器關房。 */
+  function endHostRoom(announce) {
+    if (!host) return;
+    var code = host.code;
+    host = null;
+    hostMode = false;
+    q('hostbar').hidden = true;
+    setChatVisible(false);
+    setChatOpen(false);
+    if (announce) {
+      w.Online.closeRoom(function () {});
+      toast('房間 ' + code + ' 已關閉');
+    } else {
+      w.Online.disconnect();
+    }
+  }
+
+  function shareUrl() {
+    if (!host) return '';
+    var base = w.location.origin + w.location.pathname;
+    var params = [];
+    /* 保留目前的 ?server= 覆蓋，不然對方打開連結會連到別台（或單機） */
+    var override = /[?&]server=([^&]*)/.exec(w.location.search);
+    if (override) params.push('server=' + override[1]);
+    params.push('room=' + encodeURIComponent(host.code));
+    params.push('invite=' + encodeURIComponent(host.invite));
+    return base + '?' + params.join('&');
+  }
+
+  function doShare() {
+    if (!host) return;
+    var url = shareUrl();
+    var text = '來看我解數獨！房號 ' + host.code;
+    if (w.navigator && typeof w.navigator.share === 'function') {
+      w.navigator.share({ title: '數獨小學堂 觀戰', text: text, url: url })
+        .then(function () { say('連結已經分享出去了。', 'good'); })
+        .catch(function () { copyShare(url); });
+      return;
+    }
+    copyShare(url);
+  }
+
+  function copyShare(url) {
+    if (w.navigator && w.navigator.clipboard && typeof w.navigator.clipboard.writeText === 'function') {
+      w.navigator.clipboard.writeText(url).then(function () {
+        toast('連結已複製');
+        say('觀戰連結已複製到剪貼簿：' + url, 'good');
+      }).catch(function () {
+        say('複製失敗，請手動複製這個連結：' + url, 'warn');
+      });
+      return;
+    }
+    say('請手動複製這個觀戰連結：' + url, 'warn');
+  }
+
+  function doReinvite() {
+    if (!host) return;
+    w.Online.rotateInvite(function (err, data) {
+      if (err) { say('換連結失敗：' + err.message, 'bad'); return; }
+      host.invite = data.inviteToken;
+      toast('舊連結已失效');
+      say('已經產生新的觀戰連結，之前發出去的連結立刻失效（用房號 ' + host.code + ' 還是進得來）。', 'good');
+    });
+  }
+
+  /* ---------- 觀戰 ---------- */
+  function buildWatchBoard() {
+    var board = q('watch-board');
+    board.innerHTML = '';
+    watchCells = [];
+    for (var i = 0; i < 81; i++) {
+      var r = S.ROW_OF[i], c = S.COL_OF[i];
+      var cell = D.createElement('div');
+      cell.className = 'cell' + ((c === 2 || c === 5) ? ' br' : '') + ((r === 2 || r === 5) ? ' bb' : '') +
+        (c >= 7 ? ' note-right' : '') + (r >= 7 ? ' note-bottom' : '');
+      cell.setAttribute('data-i', String(i));
+      cell.setAttribute('role', 'gridcell');
+      var v = D.createElement('span'); v.className = 'v';
+      var nt = D.createElement('span'); nt.className = 'nt';
+      for (var d = 1; d <= 9; d++) {
+        var n = D.createElement('i');
+        n.textContent = String(d);
+        nt.appendChild(n);
+      }
+      cell.appendChild(v);
+      cell.appendChild(nt);
+      appendSharedNoteChrome(cell);
+      board.appendChild(cell);
+      watchCells.push(cell);
+    }
+    board.addEventListener('click', function (e) {
+      var noteToggle = e.target.closest ? e.target.closest('.cell-note-corner') : null;
+      if (noteToggle) {
+        e.preventDefault();
+        e.stopPropagation();
+        selectWatchCell(parseInt(noteToggle.parentNode.getAttribute('data-i'), 10), true, true);
+        return;
+      }
+      var target = e.target.closest ? e.target.closest('.cell') : null;
+      if (!target) return;
+      selectWatchCell(parseInt(target.getAttribute('data-i'), 10), true, false);
+    });
+  }
+
+  function normalizeCellNoteList(raw) {
+    var out = [];
+    if (!Array.isArray(raw)) return out;
+    raw.forEach(function (note) {
+      if (!note || typeof note.text !== 'string' || !note.text) return;
+      out.push({
+        id: String(note.id || ''),
+        authorId: String(note.authorId || ''),
+        role: note.role === 'host' ? 'host' : 'viewer',
+        name: String(note.name || '路過的觀眾'),
+        text: note.text.slice(0, 10)
+      });
+    });
+    return out;
+  }
+
+  function normalizeCellNotes(raw) {
+    var out = [];
+    for (var i = 0; i < 81; i++) out[i] = normalizeCellNoteList(raw && raw[i]);
+    return out;
+  }
+
+  function notesFor(owner, index) {
+    return owner && owner.cellNotes && Array.isArray(owner.cellNotes[index])
+      ? owner.cellNotes[index] : [];
+  }
+
+  function renderCellNotes(el, owner, index, open) {
+    var list = notesFor(owner, index);
+    var corner = el.querySelector('.cell-note-corner');
+    var count = corner.querySelector('.cell-note-count');
+    var popover = el.querySelector('.cell-note-popover');
+    var items = popover.querySelector('.cell-note-items');
+    el.classList.toggle('has-shared-notes', list.length > 0);
+    corner.classList.toggle('has-notes', list.length > 0);
+    count.textContent = list.length ? String(list.length) : '';
+    corner.setAttribute('aria-label', list.length
+      ? '查看這格的 ' + list.length + ' 則共享備註'
+      : '查看這格的共享備註，目前沒有內容');
+    popover.hidden = !open;
+    while (items.firstChild) items.removeChild(items.firstChild);
+    if (!list.length) {
+      var empty = D.createElement('span');
+      empty.className = 'cell-note-empty';
+      empty.textContent = '目前沒有共享備註';
+      items.appendChild(empty);
+      return;
+    }
+    list.forEach(function (note) {
+      var row = D.createElement('span');
+      row.className = 'cell-note-item';
+      var who = D.createElement('b');
+      who.textContent = (note.role === 'host' ? '主持人：' : '') + note.name;
+      var text = D.createElement('span');
+      text.textContent = note.text;
+      row.appendChild(who);
+      row.appendChild(text);
+      items.appendChild(row);
+    });
+  }
+
+  function noteAuthorId() {
+    var me = w.Online.current();
+    return me && me.role === 'host' ? 'host' : (me && me.viewerId ? me.viewerId : '');
+  }
+
+  function renderWatchNotePanel() {
+    var label = q('watch-note-cell');
+    var input = q('watch-note-input');
+    var listEl = q('watch-note-list');
+    if (!label || !input || !listEl) return;
+    if (!watch || !watch.view || watch.selected < 0) {
+      label.textContent = '尚未選格';
+      if (D.activeElement !== input) input.value = '';
+      listEl.textContent = '先點盤面上的格子。';
+      return;
+    }
+
+    var index = watch.selected;
+    var list = notesFor(watch, index);
+    label.textContent = S.cellName(index);
+    if (D.activeElement !== input) {
+      var mine = list.find(function (note) { return note.authorId === noteAuthorId(); });
+      input.value = mine ? mine.text : '';
+    }
+    while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+    if (!list.length) {
+      var empty = D.createElement('p');
+      empty.className = 'watch-note-empty';
+      empty.textContent = '這格目前還沒有共享備註。';
+      listEl.appendChild(empty);
+      return;
+    }
+    list.forEach(function (note) {
+      var row = D.createElement('div');
+      row.className = 'watch-note-item' + (note.authorId === noteAuthorId() ? ' mine' : '');
+      var who = D.createElement('b');
+      who.textContent = note.name + (note.authorId === noteAuthorId() ? '（你）' : '') +
+        (note.role === 'host' ? '（主持人）' : '');
+      var text = D.createElement('span');
+      text.textContent = note.text;
+      row.appendChild(who);
+      row.appendChild(text);
+      listEl.appendChild(row);
+    });
+  }
+
+  function renderWatchBoard() {
+    if (!watch || !watch.view) return;
+    var view = watch.view;
+    /* 衝突用同一份 sudoku.js 算，不是伺服器算好送過來的 */
+    var conflicts = S.findConflicts(view.values);
+    var selValue = watch.selected >= 0 ? view.values[watch.selected] : 0;
+    for (var i = 0; i < 81; i++) {
+      var el = watchCells[i];
+      var v = view.values[i];
+      var cls = 'cell';
+      if (S.COL_OF[i] === 2 || S.COL_OF[i] === 5) cls += ' br';
+      if (S.ROW_OF[i] === 2 || S.ROW_OF[i] === 5) cls += ' bb';
+      if (S.COL_OF[i] >= 7) cls += ' note-right';
+      if (S.ROW_OF[i] >= 7) cls += ' note-bottom';
+      if (view.given[i]) cls += ' given';
+      if (i === view.selected) cls += ' sel host-sel';
+      if (i === watch.selected) cls += ' watch-sel';
+      if (options.highlightSame && selValue && v === selValue) cls += ' same';
+      if (conflicts[i]) cls += ' conflict';
+      el.className = cls;
+      el.tabIndex = i === watch.selected ? 0 : -1;
+
+      el.querySelector('.v').textContent = v ? String(v) : '';
+      var notes = el.querySelector('.nt');
+      var mask = v ? 0 : view.notes[i];
+      notes.style.display = mask ? '' : 'none';
+      for (var d = 1; d <= 9; d++) {
+        notes.childNodes[d - 1].className = (mask & S.BIT[d]) ? 'on' : '';
+      }
+      renderCellNotes(el, watch, i, watchNoteOpenIndex === i);
+      var shared = notesFor(watch, i);
+      el.setAttribute('aria-label', '第 ' + (S.ROW_OF[i] + 1) + ' 列第 ' + (S.COL_OF[i] + 1) + ' 行，' +
+        (v ? (view.given[i] ? '題目給的 ' : '') + v : '空格') +
+        (shared.length ? '，有 ' + shared.length + ' 則共享備註' : '，可查看或填寫共享備註'));
+    }
+    renderWatchNotePanel();
+  }
+
+  function selectWatchCell(index, fromUser, openNotes) {
+    if (!watch || !watch.view || index < 0 || index >= 81) return;
+    if (openNotes) {
+      watchNoteOpenIndex = watchNoteOpenIndex === index ? -1 : index;
+    } else {
+      watchNoteOpenIndex = -1;
+    }
+    watch.selected = index;
+    renderWatchBoard();
+    if (watchCells[index]) watchCells[index].focus({ preventScroll: true });
+    if (fromUser) w.Sound.play('select');
+  }
+
+  function moveWatchSelection(dr, dc) {
+    if (!watch || !watch.view) return;
+    var index = watch.selected >= 0 ? watch.selected : 0;
+    var r = S.ROW_OF[index], c = S.COL_OF[index];
+    r = Math.min(8, Math.max(0, r + dr));
+    c = Math.min(8, Math.max(0, c + dc));
+    selectWatchCell(r * 9 + c, true, false);
+  }
+
+  function joinRoom(code, invite) {
+    code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+    if (code.length !== 4) {
+      toast('房號要 4 個英數字');
+      setLobbyState('error', '房號格式不對：要 4 個英數字，例如 K7Q2。');
+      return;
+    }
+    if (!w.Online.isEnabled()) {
+      go('s-lobby');
+      renderLobby();
+      return;
+    }
+    leaveWatch(false);
+    watch = {
+      code: code, invite: invite || '', view: null, meta: null, viewers: 0,
+      cellNotes: normalizeCellNotes(), selected: -1
+    };
+    watchNoteOpenIndex = -1;
+    lastWatchValues = '';
+    q('w-code').textContent = '房號 ' + code;
+    q('w-host').textContent = '主持人 —';
+    q('w-diff').textContent = '—';
+    q('sum-host').textContent = '—';
+    q('sum-diff').textContent = '—';
+    q('sum-seed').textContent = '—';
+    q('sum-progress').textContent = '—';
+    q('sum-activity').textContent = '等待第一筆盤面…';
+    hideWatchOverlay();
+    resetChat('房號 ' + code);
+    setChatVisible(true);
+    setChatEnabled(false);
+    setWatchFeedback('正在連線到房間 ' + code + '…', '');
+    go('s-watch');
+
+    w.Online.connect({
+      code: code,
+      name: nickOrDefault(),
+      invite: invite,
+      on: {
+        status: onWatchStatus,
+        state: onWatchState,
+        note: onSharedNote,
+        chat: onChatMessage,
+        presence: function (p) {
+          if (!watch) return;
+          watch.viewers = p.viewers;
+          q('w-viewers').textContent = String(p.viewers);
+          q('w-host').textContent = '主持人 ' + p.hostName;
+          q('sum-host').textContent = p.hostName + (p.hostOnline ? '' : '（離線中）');
+        },
+        closed: function (data) {
+          var why = data && data.reason;
+          showWatchOverlay('closed',
+            why === 'idle' ? '房間閒置太久被回收了。'
+              : why === 'hostgone' ? '主持人離線超過寬限期，房間已經關閉。'
+                : why === 'shutdown' ? '伺服器正在重新啟動，房間都被關掉了。'
+                  : why === 'gone' ? '這個房間已經不存在了。'
+                    : '主持人結束了這個房間。');
+        }
+      }
+    });
+  }
+
+  function onWatchStatus(st, detail) {
+    setChatConn(st, detail);
+    q('sum-conn').textContent = CONN_TEXT[st] || st;
+    var live = q('w-live');
+    if (live) live.setAttribute('data-state', st === 'open' ? '' : st);
+    setChatEnabled(st === 'open');
+    setWatchNoteEnabled(st === 'open');
+    if (st === 'failed') {
+      showWatchOverlay('failed', detail || '連不上伺服器。可能是網路斷了，或伺服器正在休眠。');
+    } else if (st === 'open') {
+      hideWatchOverlay();
+      setWatchFeedback('觀戰中：主持人的盤面唯讀；你可以點格子填共享備註，大家都看得到。', 'good');
+    } else if (st === 'retrying' || st === 'waking' || st === 'connecting') {
+      setWatchFeedback(CONN_TEXT[st], 'warn');
+    }
+  }
+
+  function onWatchState(data) {
+    if (!watch) return;
+    var view = G.spectatorView(data.board);
+    if (!view) return;
+    var prev = lastWatchValues;
+    watch.meta = data;
+    watch.view = view;
+    watch.cellNotes = normalizeCellNotes(data.cellNotes);
+    if (!watchCells.length) buildWatchBoard();
+    renderWatchBoard();
+    resizeWatchBoard();
+
+    q('w-host').textContent = '主持人 ' + data.hostName;
+    q('w-diff').textContent = data.label || data.difficulty || '—';
+    q('w-code').textContent = '房號 ' + data.code;
+    q('w-left').textContent = String(view.remaining);
+    q('w-hint').textContent = String(view.hintsUsed);
+    q('w-miss').textContent = String(view.mistakes);
+    q('w-viewers').textContent = String(data.viewers);
+
+    q('sum-host').textContent = data.hostName + (data.hostOnline ? '' : '（離線中）');
+    q('sum-diff').textContent = (data.label || data.difficulty || '—') + (data.technique ? '（' + data.technique + '）' : '');
+    q('sum-seed').textContent = data.seed || '—';
+    q('sum-progress').textContent = '已填 ' + view.filled + ' / ' + view.total + ' 格，還剩 ' + view.remaining + ' 格';
+    q('sum-role').textContent = view.status === 'won' ? '觀戰中（這局已完成）' : '觀戰中（盤面唯讀）';
+
+    var values = G.gridToString(view.values);
+    q('sum-activity').textContent = describeChange(prev, values, view);
+    lastWatchValues = values;
+
+    startWatchClock(view);
+    if (view.status === 'won') {
+      setWatchFeedback('主持人完成了這一題！用了 ' + fmtTime(view.elapsedMs) + '，提示 ' + view.hintsUsed + ' 次。', 'good');
+      stopWatchClock();
+    }
+  }
+
+  function setWatchNoteEnabled(on) {
+    var input = q('watch-note-input');
+    var button = q('b-watch-note');
+    if (input) input.disabled = !on;
+    if (button) button.disabled = !on;
+    if (button) setTimeout(function () { w.UI.paint(button); }, 0);
+  }
+
+  function submitWatchNote() {
+    if (!watch || !watch.view || watch.selected < 0) {
+      setWatchFeedback('請先點一格，再輸入共享備註。', 'warn');
+      return;
+    }
+    var input = q('watch-note-input');
+    var text = input.value;
+    if (text.length > 10) {
+      setWatchFeedback('每格備註最多 10 個字。', 'bad');
+      return;
+    }
+    setWatchNoteEnabled(false);
+    setWatchFeedback(text.trim() ? '共享備註送出中…' : '正在移除你在這格的備註…', '');
+    w.Online.sendNote(watch.selected, text, nickOrDefault(), function (err) {
+      var open = w.Online.connState() === 'open';
+      setWatchNoteEnabled(open);
+      if (err) {
+        setWatchFeedback('備註沒有送出去：' + err.message, 'bad');
+        w.Sound.play('blocked');
+        return;
+      }
+      input.value = '';
+      renderWatchNotePanel();
+      setWatchFeedback(text.trim() ? '備註已同步，玩家和其他觀戰者都看得到。' : '你在這格的備註已移除。', 'good');
+      w.Sound.play(text.trim() ? 'note' : 'clear');
+    });
+  }
+
+  /* 比對前後兩份盤面，用一句話說明主持人剛剛做了什麼 */
+  function describeChange(before, after, view) {
+    if (view.status === 'won') return '已經完成整題！';
+    if (view.paused) return '主持人暫停了，盤面先停在這裡。';
+    if (!before || before === after) {
+      return view.selected >= 0 ? ('正在看 ' + S.cellName(view.selected) + '。') : '正在思考…';
+    }
+    for (var i = 0; i < 81; i++) {
+      if (before.charAt(i) !== after.charAt(i)) {
+        var now = after.charAt(i);
+        return now === '0'
+          ? ('把 ' + S.cellName(i) + ' 清掉了。')
+          : ('在 ' + S.cellName(i) + ' 填了 ' + now + '。');
+      }
+    }
+    return '調整了筆記。';
+  }
+
+  function startWatchClock(view) {
+    stopWatchClock();
+    watchClock = { base: view.elapsedMs, at: Date.now(), running: view.status === 'playing' && !view.paused };
+    q('w-time').textContent = fmtTime(view.elapsedMs);
+    if (!watchClock.running) return;
+    watchTimer = setInterval(function () {
+      if (!watchClock || cur !== 's-watch') return;
+      q('w-time').textContent = fmtTime(watchClock.base + (Date.now() - watchClock.at));
+    }, 1000);
+  }
+  function stopWatchClock() {
+    if (watchTimer) { clearInterval(watchTimer); watchTimer = null; }
+  }
+
+  function setWatchFeedback(text, kind) {
+    var el = q('w-feedback');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'feedback' + (kind ? ' ' + kind : '');
+  }
+
+  function showWatchOverlay(kind, note) {
+    var ov = q('watch-overlay');
+    stopWatchClock();
+    q('watch-ov-face').textContent = kind === 'failed' ? '📡' : '📴';
+    q('watch-ov-title').textContent = kind === 'failed' ? '連不上房間' : '房間已關閉';
+    q('watch-ov-note').textContent = note || '';
+    q('b-watch-retry').hidden = false;
+    ov.classList.add('on');
+    ov.setAttribute('aria-hidden', 'false');
+    setChatEnabled(false);
+    setTimeout(function () { var b = q('watch-ov-box'); if (b) b.focus(); }, 20);
+    w.Sound.play('leave');
+  }
+  function hideWatchOverlay() {
+    var ov = q('watch-overlay');
+    ov.classList.remove('on');
+    ov.setAttribute('aria-hidden', 'true');
+  }
+
+  function leaveWatch(goLobby) {
+    if (watch) {
+      w.Online.disconnect();
+      watch = null;
+    }
+    stopWatchClock();
+    watchClock = null;
+    hideWatchOverlay();
+    setChatVisible(false);
+    setChatOpen(false);
+    if (goLobby) go('s-lobby');
+  }
+
+  /* ---------- 留言板 ---------- */
+  function setChatVisible(on) {
+    var fab = q('b-chat');
+    fab.hidden = !on;
+    if (!on) {
+      q('chat-panel').classList.remove('open');
+      q('chat-panel').setAttribute('aria-hidden', 'true');
+      q('chat-backdrop').hidden = true;
+      chatOpen = false;
+    }
+    setTimeout(function () { if (on) w.UI.paint(fab); }, 0);
+  }
+
+  function setChatOpen(on) {
+    var panel = q('chat-panel');
+    var fab = q('b-chat');
+    chatOpen = !!on && !fab.hidden;
+    panel.classList.toggle('open', chatOpen);
+    panel.setAttribute('aria-hidden', chatOpen ? 'false' : 'true');
+    fab.setAttribute('aria-expanded', chatOpen ? 'true' : 'false');
+    /* 遮罩只在窄版出現（CSS 決定是否顯示成整片），寬版點外面也不會誤關 */
+    q('chat-backdrop').hidden = !chatOpen || w.innerWidth > 560;
+    if (chatOpen) {
+      chatUnread = 0;
+      updateChatBadge();
+      chatLastFocus = D.activeElement;
+      var log = q('chat-log');
+      log.scrollTop = log.scrollHeight;
+      setTimeout(function () { w.UI.repaintAll(panel); }, 20);
+    } else if (chatLastFocus && chatLastFocus.focus) {
+      try { chatLastFocus.focus(); } catch (e) {}
+      chatLastFocus = null;
+    }
+  }
+
+  function updateChatBadge() {
+    var badge = q('chat-badge');
+    badge.hidden = chatUnread <= 0;
+    badge.textContent = chatUnread > 99 ? '99+' : String(chatUnread);
+    q('b-chat').setAttribute('aria-label', chatUnread > 0
+      ? ('開啟房間留言板，有 ' + chatUnread + ' 則新訊息')
+      : '開啟房間留言板');
+  }
+
+  function resetChat(roomLabel) {
+    chatSeen = {};
+    chatUnread = 0;
+    updateChatBadge();
+    q('chat-room').textContent = roomLabel || '';
+    var log = q('chat-log');
+    log.innerHTML = '';
+    var hint = D.createElement('p');
+    hint.className = 'chat-empty';
+    hint.textContent = '這裡是房間留言板，房間關掉之後訊息就不會保留。禮貌一點，大家都看得到。';
+    log.appendChild(hint);
+    setChatNote('最多 120 字，送太快會被伺服器擋下來。', false);
+  }
+
+  function setChatConn(kind, detail) {
+    var el = q('chat-conn');
+    if (!el) return;
+    el.setAttribute('data-state', kind);
+    el.textContent = (CONN_TEXT[kind] || kind) + (detail && kind === 'retrying' ? '（' + detail + '）' : '');
+  }
+
+  function setChatNote(text, bad) {
+    var el = q('chat-note');
+    el.textContent = text;
+    el.className = 'chat-note' + (bad ? ' bad' : '');
+  }
+
+  function setChatEnabled(on) {
+    q('chat-input').disabled = !on;
+    q('b-chat-send').disabled = !on;
+    setTimeout(function () { w.UI.paint(q('b-chat-send')); }, 0);
+  }
+
+  function chatLogEl() {
+    var log = q('chat-log');
+    var empty = log.querySelector('.chat-empty');
+    if (empty) log.removeChild(empty);
+    return log;
+  }
+
+  function systemChat(text) {
+    var log = chatLogEl();
+    var box = D.createElement('div');
+    box.className = 'chat-msg system';
+    var tx = D.createElement('span');
+    tx.className = 'tx';
+    tx.textContent = text;
+    box.appendChild(tx);
+    log.appendChild(box);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function onChatMessage(msg) {
+    if (!msg || chatSeen[msg.id]) return;
+    chatSeen[msg.id] = true;
+    var me = w.Online.current();
+    var mine = !!(me && ((me.role === 'host' && msg.role === 'host') ||
+      (me.role === 'viewer' && msg.role === 'viewer' && msg.name === nickOrDefault())));
+
+    var log = chatLogEl();
+    var box = D.createElement('div');
+    box.className = 'chat-msg' + (msg.role === 'host' ? ' host' : '') + (mine ? ' me' : '');
+    var who = D.createElement('span');
+    who.className = 'who';
+    /* 使用者輸入一律 textContent，絕不用 innerHTML */
+    who.textContent = msg.name + (msg.role === 'host' ? '（主持人）' : '');
+    var tx = D.createElement('span');
+    tx.className = 'tx';
+    tx.textContent = msg.text;
+    box.appendChild(who);
+    box.appendChild(tx);
+    log.appendChild(box);
+
+    var near = log.scrollHeight - log.scrollTop - log.clientHeight < 90;
+    if (near || mine) log.scrollTop = log.scrollHeight;
+
+    if (!mine) {
+      if (!chatOpen) { chatUnread++; updateChatBadge(); }
+      w.Sound.playChat();
+    }
+  }
+
+  function submitChat() {
+    var input = q('chat-input');
+    var text = input.value.trim();
+    if (!text) { setChatNote('先寫點東西再送出。', true); return; }
+    setChatEnabled(false);
+    setChatNote('送出中…', false);
+    w.Online.sendChat(text, nickOrDefault(), function (err) {
+      var open = w.Online.connState() === 'open';
+      setChatEnabled(open);
+      if (err) {
+        setChatNote('沒送出去：' + err.message, true);
+        w.Sound.play('blocked');
+        return;
+      }
+      input.value = '';
+      setChatNote('最多 120 字，送太快會被伺服器擋下來。', false);
+      if (open) input.focus();
+    });
+  }
+
+  /* ---------- 觀戰盤面尺寸 ---------- */
+  function resizeWatchBoard() {
+    resizeBoardIn('s-watch', 'watch-board');
+  }
+
+  /* ---------- 深連結：?room=XXXX&invite=... ---------- */
+  function deepLinkRoom() {
+    var m = /[?&]room=([A-Za-z0-9]{1,8})/.exec(w.location.search);
+    if (!m) return false;
+    var invite = '';
+    var mi = /[?&]invite=([^&]*)/.exec(w.location.search);
+    if (mi) { try { invite = decodeURIComponent(mi[1]); } catch (e) { invite = mi[1]; } }
+    if (!w.Online.isEnabled()) {
+      go('s-lobby');
+      renderLobby();
+      return true;
+    }
+    joinRoom(m[1], invite);
+    return true;
+  }
+
+  /* ---------- 綁定 ---------- */
+  function bindOnline() {
+    q('b-online').addEventListener('click', function () {
+      w.Sound.play('click');
+      go('s-lobby');
+    });
+    q('b-lobby-refresh').addEventListener('click', function () {
+      w.Sound.play('click');
+      refreshLobby();
+    });
+    q('b-lobby-host').addEventListener('click', function () {
+      w.Sound.play('click');
+      setHostMode(true);
+      markDiff(pendingDifficulty);
+      go('s-setup');
+    });
+    q('b-lobby-join').addEventListener('click', function () {
+      w.Sound.play('click');
+      joinRoom(q('lobby-code').value, '');
+    });
+    q('lobby-code').addEventListener('input', function (e) {
+      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+    });
+    q('lobby-code').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); joinRoom(e.target.value, ''); }
+    });
+    q('lobby-nick').addEventListener('input', function (e) {
+      nick = w.Store.normalizeNick(e.target.value);
+      w.Store.saveNick(nick);
+    });
+
+    q('b-share').addEventListener('click', function () { w.Sound.play('click'); doShare(); });
+    q('b-reinvite').addEventListener('click', function () { w.Sound.play('click'); doReinvite(); });
+    q('b-close-room').addEventListener('click', function () {
+      w.Sound.play('click');
+      endHostRoom(true);
+      say('觀戰房間已經關閉，你可以繼續自己解這一題。', 'good');
+    });
+
+    q('b-watch-leave').addEventListener('click', function () { w.Sound.play('click'); leaveWatch(true); });
+    q('b-watch-lobby').addEventListener('click', function () { w.Sound.play('click'); leaveWatch(true); });
+    q('b-watch-retry').addEventListener('click', function () {
+      w.Sound.play('click');
+      if (!watch) { go('s-lobby'); return; }
+      joinRoom(watch.code, watch.invite);
+    });
+    q('watch-note-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      submitWatchNote();
+    });
+
+    q('b-sum-toggle').addEventListener('click', function () {
+      var box = q('w-summary');
+      var open = box.classList.toggle('collapsed');
+      q('b-sum-toggle').setAttribute('aria-expanded', open ? 'false' : 'true');
+      q('b-sum-toggle').textContent = open ? '展開' : '收合';
+      w.Sound.play('click');
+      setTimeout(resizeWatchBoard, 30);
+    });
+
+    q('b-chat').addEventListener('click', function () { w.Sound.play('click'); setChatOpen(!chatOpen); });
+    q('chat-close').addEventListener('click', function () { w.Sound.play('click'); setChatOpen(false); });
+    q('chat-backdrop').addEventListener('click', function () { setChatOpen(false); });
+    q('chat-form').addEventListener('submit', function (e) { e.preventDefault(); submitChat(); });
+
+    /* 離開分頁前把房間收乾淨，別留下殭屍房 */
+    w.addEventListener('pagehide', function () {
+      if (host) w.Online.closeRoom(function () {});
+      else if (watch) w.Online.disconnect();
+    });
+  }
+
   /* ---------- 設定彈窗 ---------- */
   /* 連線狀態：server URL 只從 GameConfig 拿，這裡不自己拼網址。
    * 單機模式（沒設定）不會發出任何請求，畫面直接顯示「單機」。 */
@@ -641,6 +1735,8 @@
     q('settings-music-status').textContent = musicOn ? '開啟' : '關閉';
     q('settings-sfx-status').textContent = sfxOn ? '開啟' : '關閉';
     q('settings-haptic').checked = w.Sound.isHapticOn();
+    q('settings-chatcue').checked = w.Sound.isChatCueOn();
+    q('settings-nick').value = nick;
     q('settings-motion').checked = options.motion;
     q('settings-autonotes').checked = options.autoClearNotes;
     q('settings-mistakes').checked = options.markMistakes;
@@ -654,7 +1750,7 @@
   }
 
   function focusableIn(root) {
-    return qa('button, input, [tabindex]:not([tabindex="-1"])', root).filter(function (el) {
+    return qa('button, input, summary, [tabindex]:not([tabindex="-1"])', root).filter(function (el) {
       return !el.disabled && el.offsetParent !== null;
     });
   }
@@ -673,6 +1769,8 @@
     q('b-settings').setAttribute('aria-expanded', open ? 'true' : 'false');
     if (open) {
       syncSettings();
+      /* 彈窗原本是 display:none，立體按鈕量不到尺寸，開啟後補畫一次 */
+      w.UI.repaintAll(q('settings-panel'));
       q('settings-panel').focus();
     } else {
       /* 關閉後把焦點還給原本的元素；若原本沒有明確焦點（例如觸控直接點開），就還給設定按鈕 */
@@ -714,6 +1812,13 @@
     q('settings-haptic').addEventListener('change', function (e) {
       w.Sound.setHaptic(e.target.checked);
       if (e.target.checked) w.Sound.vibrate(12);
+    });
+    q('settings-chatcue').addEventListener('change', function (e) { w.Sound.setChatCue(e.target.checked); });
+    q('settings-nick').addEventListener('input', function (e) {
+      nick = w.Store.normalizeNick(e.target.value);
+      w.Store.saveNick(nick);
+      var lobbyNick = q('lobby-nick');
+      if (lobbyNick) lobbyNick.value = nick;
     });
 
     function optionToggle(id, key) {
@@ -767,6 +1872,7 @@
 
     q('b-new').addEventListener('click', function () {
       w.Sound.play('click');
+      setHostMode(false);
       markDiff(pendingDifficulty);
       go('s-setup');
     });
@@ -800,6 +1906,7 @@
 
     q('b-quit').addEventListener('click', function () {
       w.Sound.play('click');
+      if (host) endHostRoom(true);
       stopTimer(); saveNow(); go('s-home');
     });
     q('b-pause').addEventListener('click', function () { setPaused(!paused); });
@@ -816,6 +1923,7 @@
     q('b-pausequit').addEventListener('click', function () {
       w.Sound.play('click');
       setPaused(false);
+      if (host) endHostRoom(true);
       stopTimer(); saveNow(); go('s-home');
     });
 
@@ -830,7 +1938,12 @@
       startNewGame(state ? state.difficulty : pendingDifficulty, '');
     });
     q('b-changediff').addEventListener('click', function () { w.Sound.play('click'); markDiff(pendingDifficulty); go('s-setup'); });
-    q('b-home2').addEventListener('click', function () { w.Sound.play('click'); go('s-home'); });
+    q('b-home2').addEventListener('click', function () {
+      w.Sound.play('click');
+      if (host) endHostRoom(true);
+      setHostMode(false);
+      go('s-home');
+    });
 
     q('b-clearstats').addEventListener('click', function () {
       w.Sound.play('click');
@@ -850,12 +1963,32 @@
       renderTutorial();
     });
     q('b-help-skip').addEventListener('click', function () { w.Sound.play('click'); go('s-home'); });
-    q('b-tut-play').addEventListener('click', function () { w.Sound.play('click'); startNewGame('easy', ''); });
+    q('b-tut-play').addEventListener('click', function () { w.Sound.play('click'); setHostMode(false); startNewGame('beginner', ''); });
 
     /* 鍵盤操作 */
     D.addEventListener('keydown', function (e) {
       if (isSettingsOpen()) {
         if (e.key === 'Escape') { e.preventDefault(); setSettingsOpen(false); }
+        return;
+      }
+      /* 在留言板或任何文字欄位打字時，不可以把按鍵當成盤面操作 */
+      var ae = D.activeElement;
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) {
+        if (e.key === 'Escape' && chatOpen) { e.preventDefault(); setChatOpen(false); }
+        return;
+      }
+      if (e.key === 'Escape' && chatOpen) { e.preventDefault(); setChatOpen(false); return; }
+      if (cur === 's-watch') {
+        if (!watch || watch.selected < 0) return;
+        switch (e.key) {
+          case 'ArrowUp': e.preventDefault(); moveWatchSelection(-1, 0); break;
+          case 'ArrowDown': e.preventDefault(); moveWatchSelection(1, 0); break;
+          case 'ArrowLeft': e.preventDefault(); moveWatchSelection(0, -1); break;
+          case 'ArrowRight': e.preventDefault(); moveWatchSelection(0, 1); break;
+          case 'Enter': case ' ': e.preventDefault(); selectWatchCell(watch.selected, true, true); break;
+          case 'Escape': e.preventDefault(); watchNoteOpenIndex = -1; renderWatchBoard(); break;
+          default: break;
+        }
         return;
       }
       if (cur !== 's-game' || !state) return;
@@ -886,6 +2019,8 @@
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(function () {
         resizeBoard();
+        resizeWatchBoard();
+        if (chatOpen) setChatOpen(true);
         w.UI.repaintAll(q(cur));
       }, 80);
     }
@@ -915,8 +2050,15 @@
     D.addEventListener('keydown', firstGesture);
   }
 
+  function setHostMode(on) {
+    hostMode = !!on;
+    q('setup-online').hidden = !hostMode;
+    w.UI.setLabel(q('b-start'), hostMode ? '開房並開始 ▶' : '出題開始 ▶');
+    setTimeout(function () { w.UI.paint(q('b-start')); }, 20);
+  }
+
   function markDiff(v) {
-    pendingDifficulty = S.PRESETS[v] ? v : 'easy';
+    pendingDifficulty = S.PRESETS[v] ? v : 'beginner';
     qa('.optcard', q('opt-diff')).forEach(function (b) {
       b.classList.toggle('on', b.getAttribute('data-v') === pendingDifficulty);
       b.setAttribute('aria-pressed', b.getAttribute('data-v') === pendingDifficulty ? 'true' : 'false');
@@ -930,13 +2072,18 @@
     buildBoard();
     buildNumpad();
     w.UI.decorateAll();
+    buildWatchBoard();
     bind();
     bindSettings();
+    bindOnline();
     applyOptions();
     markDiff(pendingDifficulty);
     refreshHome();
     renderTutorial();
-    go('s-home');
+    updateChatBadge();
+    setChatVisible(false);
+    /* 有 ?room=XXXX 就直接進觀戰，沒有就照常回主選單 */
+    if (!deepLinkRoom()) go('s-home');
   }
 
   if (D.readyState === 'loading') D.addEventListener('DOMContentLoaded', init);

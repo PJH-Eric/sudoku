@@ -363,8 +363,69 @@
     return state;
   }
 
+  /* ---------- 線上觀戰用的唯讀快照 ----------
+   * 觀戰＝主持人狀態的唯讀鏡像，所以「要送什麼」只有這裡一份定義，主持人與觀戰端共用。
+   * 刻意不送 solution：觀戰者不需要答案，也不該從網路封包裡拿得到。
+   * 衝突、剩餘數量、每個數字還剩幾格，觀戰端都用同一份 sudoku.js 自己算，規則核心不會分岔。 */
+  function spectatorSnapshot(state, extra) {
+    var e = extra || {};
+    return {
+      puzzle: gridToString(state.puzzle),
+      values: gridToString(state.values),
+      notes: state.notes.slice(),
+      selected: (typeof e.selected === 'number' && e.selected >= 0 && e.selected < CELLS) ? e.selected : -1,
+      elapsedMs: Math.max(0, Math.floor(state.elapsedMs || 0)),
+      hintsUsed: state.hintsUsed | 0,
+      mistakes: state.mistakes | 0,
+      status: state.status === 'won' ? 'won' : 'playing',
+      paused: !!e.paused
+    };
+  }
+
+  /* 觀戰端：把快照變成一個欄位名稱與一般局面相同的物件，
+   * 這樣畫面層可以沿用同一套繪製邏輯，差別只在 readOnly 為 true、沒有 solution。 */
+  function spectatorView(board) {
+    if (!board || typeof board.puzzle !== 'string' || typeof board.values !== 'string') return null;
+    if (board.puzzle.length !== CELLS || board.values.length !== CELLS) return null;
+    var puzzle = stringToGrid(board.puzzle);
+    var values = stringToGrid(board.values);
+    var given = new Array(CELLS);
+    var notes = new Array(CELLS);
+    var i, filled = 0, total = 0;
+    for (i = 0; i < CELLS; i++) {
+      given[i] = puzzle[i] !== 0;
+      /* 題目原本就給的格子一律以題目為準，不接受鏡像資料把它改掉 */
+      if (given[i]) values[i] = puzzle[i];
+      else {
+        total++;
+        if (values[i]) filled++;
+      }
+      var n = (board.notes && board.notes[i]) | 0;
+      notes[i] = values[i] ? 0 : (n & S.FULL_MASK);
+    }
+    var sel = board.selected;
+    return {
+      readOnly: true,
+      puzzle: puzzle,
+      values: values,
+      given: given,
+      notes: notes,
+      selected: (typeof sel === 'number' && sel >= 0 && sel < CELLS) ? sel : -1,
+      elapsedMs: Math.max(0, Math.floor(board.elapsedMs || 0)),
+      hintsUsed: board.hintsUsed | 0,
+      mistakes: board.mistakes | 0,
+      status: board.status === 'won' ? 'won' : 'playing',
+      paused: !!board.paused,
+      filled: filled,
+      total: total,
+      remaining: total - filled
+    };
+  }
+
   w.SudokuGame = {
     DEFAULT_OPTIONS: DEFAULT_OPTIONS,
+    spectatorSnapshot: spectatorSnapshot,
+    spectatorView: spectatorView,
     create: create,
     fromPuzzle: fromPuzzle,
     remaining: remaining,
