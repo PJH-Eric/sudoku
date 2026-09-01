@@ -20,6 +20,7 @@
  *   GET  /api/rooms/:code             單一房間資訊（加入前先確認房間還在）
  *   GET  /api/rooms/:code/stream      SSE：state / note / chat / presence / closed / 心跳
  *   POST /api/rooms/:code/state       主持人更新盤面（需要 hostToken）
+ *   POST /api/rooms/:code/round       主持人在同一房間開始下一局（需要 hostToken）
  *   POST /api/rooms/:code/note        成員新增一則共享格子留言（需要 hostToken 或 viewerToken）
  *   POST /api/rooms/:code/chat        送出訊息（需要 hostToken 或 viewerToken）
  *   POST /api/rooms/:code/close       主持人關房（需要 hostToken）
@@ -177,7 +178,7 @@ setInterval(() => {
 }, Math.min(HEARTBEAT_MS, SWEEP_MS)).unref();
 
 /* ---------- 路由 ---------- */
-const ROOM_PATH = /^\/api\/rooms\/([A-Za-z0-9]{1,8})(\/(stream|state|note|chat|close|invite))?$/;
+const ROOM_PATH = /^\/api\/rooms\/([A-Za-z0-9]{1,8})(\/(stream|state|round|note|chat|close|invite))?$/;
 
 function handleApi(req, res, urlPath, query) {
   if (originBlocked(req)) {
@@ -237,6 +238,7 @@ function handleApi(req, res, urlPath, query) {
     const data = body || {};
     let result;
     if (action === 'state') result = store.updateState(code, data.token, data.snapshot);
+    else if (action === 'round') result = store.restartRoom(code, data.token, data);
     else if (action === 'note') result = store.updateCellNote(code, data.token, data.index, data.text, data.name);
     else if (action === 'chat') result = store.chat(code, data.token, data.text, data.name);
     else if (action === 'close') result = store.closeRoom(code, data.token, 'host');

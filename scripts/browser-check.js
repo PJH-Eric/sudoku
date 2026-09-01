@@ -729,6 +729,23 @@ async function main() {
   check('房主在 390×844 也看得到房號', /^[A-Z0-9]{4}$/.test(hostMobileUi.text) && hostMobileUi.viewportWidth === 390 &&
     hostMobileUi.boxWidth > 0 && hostMobileUi.boxHeight > 0 && hostMobileUi.codeWidth > 0 && hostMobileUi.codeHeight > 0, JSON.stringify(hostMobileUi));
   await shot('房主開房-390x844');
+
+  await cdp.eval(
+    "var hintCount=0; while(document.getElementById('s-result').classList.contains('active')===false && hintCount<200){" +
+    "document.getElementById('b-hint').click(); hintCount++;} return hintCount;"
+  );
+  const hostResultReady = await waitForPage("document.getElementById('s-result').classList.contains('active')", 5000);
+  await cdp.eval("document.getElementById('b-again').click(); return 1;");
+  const sameRoomReady = await waitForPage(
+    "document.getElementById('s-game').classList.contains('active') && !document.getElementById('hostbar').hidden && " +
+    "document.getElementById('h-code').textContent === " + JSON.stringify(hostUi.text) + " && " +
+    "document.getElementById('h-conn').getAttribute('data-state') === 'open'", 5000
+  );
+  const sameRoomUi = JSON.parse(await cdp.eval(
+    "return JSON.stringify({result:" + String(hostResultReady) + ",same:" + String(sameRoomReady) + "," +
+    "code:document.getElementById('h-code').textContent,conn:document.getElementById('h-conn').getAttribute('data-state')});"
+  ));
+  check('再來一局會沿用原本房號與房間連線', sameRoomUi.result && sameRoomUi.same && sameRoomUi.code === hostUi.text && sameRoomUi.conn === 'open', JSON.stringify(sameRoomUi));
   await cdp.eval("var close=document.getElementById('b-close-room'); if(!close.hidden) close.click(); return 1;");
 
   /* ---------- 線上觀戰者 UI：只允許格子留言與聊天室 ---------- */

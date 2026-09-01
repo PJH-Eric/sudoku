@@ -235,6 +235,26 @@ async function main() {
   assert.strictEqual(rejected.status, 403, '舊邀請連結必須在伺服器端失效');
   await rejected.body.cancel();
 
+  const nextRound = makeSnapshot();
+  nextRound.values = '8' + nextRound.values.slice(1);
+  const round = await jsonRequest(base + '/api/rooms/' + room.code + '/round', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      token: room.hostToken, difficulty: 'hard', label: '困難',
+      technique: '區塊摒除', seed: 'ROUND2', snapshot: nextRound
+    })
+  });
+  assert.strictEqual(round.res.status, 200);
+  assert.strictEqual(round.data.ok, true);
+  assert.strictEqual(round.data.state.code, room.code, '下一局要沿用同一房號');
+  assert.strictEqual(round.data.state.viewers, 2, '觀戰者不能因換題被移出房間');
+  await Promise.all([
+    host.waitFor('state', (data) => data.version === 3 && data.seed === 'ROUND2' && data.board.values.charAt(0) === '8'),
+    viewer.waitFor('state', (data) => data.version === 3 && data.seed === 'ROUND2' && data.board.values.charAt(0) === '8'),
+    viewer2.waitFor('state', (data) => data.version === 3 && data.seed === 'ROUND2' && data.board.values.charAt(0) === '8')
+  ]);
+
   const closed = await jsonRequest(base + '/api/rooms/' + room.code + '/close', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -304,6 +304,16 @@
     });
   }
 
+  /* 主持人換下一局時保留同一個房間與觀戰者，不重新建立 SSE 連線。 */
+  function restartRoom(payload, cb) {
+    if (!session || session.role !== 'host') {
+      if (cb) cb({ code: 'norole', message: '目前不是主持人，沒有房間可以換題。' }, null);
+      return;
+    }
+    var body = Object.assign({}, payload || {}, { token: session.token });
+    request('POST', '/api/rooms/' + encodeURIComponent(session.code) + '/round', body, cb);
+  }
+
   /* 重新產生邀請連結：舊連結立刻失效，房號仍然可以進來（房間是公開的） */
   function rotateInvite(cb) {
     if (!session || session.role !== 'host') {
@@ -394,6 +404,7 @@
     connect: connect,
     disconnect: disconnect,
     closeRoom: closeRoom,
+    restartRoom: restartRoom,
     rotateInvite: rotateInvite,
     sendChat: sendChat,
     sendNote: sendNote,

@@ -520,11 +520,18 @@
   }
 
   /* ---------- 出題流程 ---------- */
-  function startNewGame(difficulty, seed) {
-    if (host) {
-      /* 一間房綁一題：換題目就換一間房，避免觀戰者看到的題目突然變掉 */
+  function startNewGame(difficulty, seed, keepHostRoom) {
+    var reuseRoom = !!keepHostRoom && !!host;
+    if (host && !reuseRoom) {
+      /* 換難度或從其他流程開新題目時，仍維持一間房只對應一題。 */
       endHostRoom(true);
       hostMode = true;
+    }
+    if (reuseRoom) {
+      /* 換題期間先停掉舊題目的定時推送，避免把上一局快照送回伺服器。 */
+      w.Online.stopStatePush();
+      host.cellNotes = normalizeCellNotes();
+      hostNoteOpenIndex = -1;
     }
     pendingDifficulty = difficulty;
     w.Store.saveLastDifficulty(difficulty);
@@ -545,8 +552,36 @@
       }
       state = G.fromPuzzle(puzzle, { autoClearNotes: options.autoClearNotes });
       beginGame(true);
-      if (hostMode) openRoom();
+      if (reuseRoom && host) {
+        restartHostRoom();
+      } else if (hostMode) {
+        openRoom();
+      }
     }, 40);
+  }
+
+  function restartHostRoom() {
+    if (!host || !state) return;
+    var code = host.code;
+    setHostConn('connecting', '同步新題目…');
+    w.Online.restartRoom({
+      difficulty: state.difficulty,
+      label: state.label,
+      technique: state.technique,
+      seed: state.seed,
+      snapshot: hostSnapshot()
+    }, function (err) {
+      if (!host || host.code !== code) return;
+      if (err) {
+        say('房間換題失敗：' + err.message + '，這一局先以單機繼續。', 'bad');
+        toast('房間換題失敗');
+        endHostRoom(false);
+        return;
+      }
+      setHostConn('open', '已連線');
+      say('新一局開始了，房號 ' + code + ' 不變，觀戰者可以繼續觀看。', 'good');
+      w.Online.startStatePush(hostSnapshot);
+    });
   }
 
   function beginGame(isNew) {
@@ -1964,7 +1999,7 @@
 
     q('b-again').addEventListener('click', function () {
       w.Sound.play('click');
-      startNewGame(state ? state.difficulty : pendingDifficulty, '');
+      startNewGame(state ? state.difficulty : pendingDifficulty, '', true);
     });
     q('b-changediff').addEventListener('click', function () { w.Sound.play('click'); markDiff(pendingDifficulty); go('s-setup'); });
     q('b-home2').addEventListener('click', function () {

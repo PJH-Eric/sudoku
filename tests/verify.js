@@ -784,6 +784,40 @@ ok('主持人身分靠 token：別人不能改盤面、關房或換連結', () =
   assert.strictEqual(store.attachHost(res.code, res.hostToken).ok, true, '正牌主持人可以連線');
 });
 
+ok('主持人再來一局會保留同一房間與觀戰者', () => {
+  const { store } = makeStore();
+  const events = [];
+  store.on((event) => events.push(event));
+  const res = openRoom(store);
+  store.attachHost(res.code, res.hostToken);
+  const viewer = store.addViewer(res.code, { name: '甲' });
+  store.updateCellNote(res.code, viewer.viewerToken, 80, '上一局留言');
+
+  const next = makeSnapshot({
+    puzzle: '0'.repeat(81),
+    values: '0'.repeat(81),
+    selected: -1
+  });
+  const restarted = store.restartRoom(res.code, res.hostToken, {
+    difficulty: 'hard',
+    label: '困難',
+    technique: '區塊摒除',
+    seed: 'ROUND2',
+    snapshot: next
+  });
+
+  assert.strictEqual(restarted.ok, true);
+  assert.strictEqual(restarted.state.code, res.code, '下一局要沿用原本房號');
+  assert.strictEqual(restarted.state.difficulty, 'hard');
+  assert.strictEqual(restarted.state.seed, 'ROUND2');
+  assert.strictEqual(restarted.state.status, 'live');
+  assert.strictEqual(restarted.state.viewers, 1, '觀戰者要留在原房間');
+  assert.strictEqual(restarted.state.cellNotes[80].length, 0, '上一局的格子留言要清掉');
+  assert.strictEqual(store.getRoom(res.code).inviteToken, res.inviteToken, '邀請連結要維持不變');
+  assert.ok(events.some((event) => event.type === 'state' && event.payload.seed === 'ROUND2'),
+    '下一局要廣播新的 state 給觀戰者');
+});
+
 ok('觀戰者加入／離開會更新人數，房間滿了會被擋下', () => {
   const { store } = makeStore({ maxViewersPerRoom: 2 });
   const res = openRoom(store);
@@ -1075,7 +1109,7 @@ ok('觀戰快照就是主持人狀態的唯讀鏡像，而且不含答案', () =
 
 ok('伺服器的線上端點、CORS 與 SSE 標頭都設定正確', () => {
   const src = read(path.join(root, 'server.js'));
-  ['/api/rooms', 'stream', 'state', 'note', 'chat', 'close', 'invite'].forEach((k) => {
+  ['/api/rooms', 'stream', 'state', 'round', 'note', 'chat', 'close', 'invite'].forEach((k) => {
     assert.ok(src.indexOf(k) >= 0, 'server.js 缺少端點：' + k);
   });
   assert.ok(/text\/event-stream/.test(src), 'SSE 要設對 Content-Type');
