@@ -692,6 +692,45 @@ async function main() {
   const pl = JSON.parse(playable);
   check('連不上伺服器時照樣出得了題（單機不受影響）', pl.given > 0 && pl.unique === 1, playable);
 
+  /* ---------- 線上主持人 UI：開始新題目後直接開房並看得到自己的房號 ---------- */
+  await setViewport(VIEWPORTS[3]);
+  await goto(BASE + '?server=' + encodeURIComponent('http://127.0.0.1:' + PORT));
+  await sleep(250);
+  await cdp.eval("localStorage.clear(); return 1;");
+  await goto(BASE + '?server=' + encodeURIComponent('http://127.0.0.1:' + PORT));
+  await cdp.eval("document.getElementById('b-new').click(); return 1;");
+  const setupReady = await waitForPage("document.getElementById('s-setup').classList.contains('active')", 3000);
+  await cdp.eval("document.getElementById('b-start').click(); return 1;");
+  const hostReady = await waitForPage("document.getElementById('s-game').classList.contains('active') && !document.getElementById('hostbar').hidden && document.getElementById('h-code').textContent !== '開房中…'", 5000);
+  const hostUi = JSON.parse(await cdp.eval(
+    "var hostBar=document.getElementById('hostbar'); var hostBox=document.getElementById('host-codebox'); var hostCode=document.getElementById('h-code');" +
+    "var rect=hostCode.getBoundingClientRect(); var boxRect=hostBox.getBoundingClientRect();" +
+    "var copy=document.getElementById('b-copy-room-code'); var copyRect=copy.getBoundingClientRect();" +
+    "var closeRoom=document.getElementById('b-close-room'); var closeRect=closeRoom.getBoundingClientRect();" +
+    "var boardRect=document.getElementById('board').getBoundingClientRect(); var hostBarRect=hostBar.getBoundingClientRect();" +
+    "return JSON.stringify({setup:" + String(setupReady) + ",game:" + String(hostReady) + "," +
+    "text:hostCode.textContent,display:getComputedStyle(hostCode).display,width:rect.width,height:rect.height," +
+    "boxDisplay:getComputedStyle(hostBox).display,boxWidth:boxRect.width,boxHeight:boxRect.height," +
+    "copyDisplay:getComputedStyle(copy).display,copyWidth:copyRect.width,copyHeight:copyRect.height," +
+    "hostBarBottom:hostBarRect.bottom,closeTop:closeRect.top,closeBottom:closeRect.bottom,boardTop:boardRect.top});"
+  ));
+  check('開始新題目後會直接開房並看到清楚的房號', hostUi.setup && hostUi.game && /^[A-Z0-9]{4}$/.test(hostUi.text) &&
+    hostUi.display !== 'none' && hostUi.width > 0 && hostUi.height > 0 && hostUi.boxDisplay !== 'none' &&
+    hostUi.boxWidth > 0 && hostUi.boxHeight > 0 && hostUi.copyDisplay !== 'none' && hostUi.copyWidth > 0 && hostUi.copyHeight > 0 &&
+    hostUi.hostBarBottom <= hostUi.boardTop + 1 && hostUi.closeBottom <= hostUi.boardTop + 1, JSON.stringify(hostUi));
+  await shot('房主開房-667x375');
+  await setViewport(VIEWPORTS[1]);
+  const hostMobileUi = JSON.parse(await cdp.eval(
+    "var mobileBox=document.getElementById('host-codebox'); var mobileCode=document.getElementById('h-code');" +
+    "var mobileRect=mobileCode.getBoundingClientRect(); var mobileBoxRect=mobileBox.getBoundingClientRect();" +
+    "return JSON.stringify({text:mobileCode.textContent,boxWidth:mobileBoxRect.width,boxHeight:mobileBoxRect.height," +
+    "codeWidth:mobileRect.width,codeHeight:mobileRect.height,viewportWidth:window.innerWidth});"
+  ));
+  check('房主在 390×844 也看得到房號', /^[A-Z0-9]{4}$/.test(hostMobileUi.text) && hostMobileUi.viewportWidth === 390 &&
+    hostMobileUi.boxWidth > 0 && hostMobileUi.boxHeight > 0 && hostMobileUi.codeWidth > 0 && hostMobileUi.codeHeight > 0, JSON.stringify(hostMobileUi));
+  await shot('房主開房-390x844');
+  await cdp.eval("var close=document.getElementById('b-close-room'); if(!close.hidden) close.click(); return 1;");
+
   /* ---------- 線上觀戰者 UI：只允許格子留言與聊天室 ---------- */
   await setViewport(VIEWPORTS[1]);
   await goto(BASE + '?server=' + encodeURIComponent('http://127.0.0.1:' + PORT) +

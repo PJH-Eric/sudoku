@@ -260,9 +260,13 @@
         <div class="stat"><span class="k">填錯</span><b id="st-miss">0</b></div>
       </div>
 
-      <!-- 開放觀戰時才出現：房號、觀戰人數、連線狀態、分享連結、關房 -->
+      <!-- 開房後才出現：醒目的房號、觀戰人數、連線狀態、分享連結、關房 -->
       <div class="hostbar" id="hostbar" hidden>
-        <span class="chip live" id="h-code">房號 —</span>
+        <div class="host-codebox" id="host-codebox" aria-label="主持人房號">
+          <span class="host-code-label">本場房號</span>
+          <strong id="h-code">—</strong>
+          <button class="btn3d small host-code-copy" data-color="mint" id="b-copy-room-code" type="button" aria-label="複製主持人房號">複製房號</button>
+        </div>
         <span class="chip ghost" id="h-viewers">👀 0 人觀戰</span>
         <span class="chip ghost" id="h-conn" role="status" aria-live="polite">連線中…</span>
         <button class="btn3d small" data-color="sky" id="b-share">🔗 分享連結</button>

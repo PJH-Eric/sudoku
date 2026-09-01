@@ -965,6 +965,8 @@ ok('房間總數有上限，滿了會回絕而不是無限開下去', () => {
 
 ok('房間生命週期：主持人斷線有寬限期，逾時關房，觀戰者一併被釋放', () => {
   const { store, advance } = makeStore({ hostGraceMs: 60000 });
+  const events = [];
+  store.on((event) => events.push(event));
   const res = openRoom(store);
   store.attachHost(res.code, res.hostToken);
   store.addViewer(res.code, { name: '甲' });
@@ -974,6 +976,7 @@ ok('房間生命週期：主持人斷線有寬限期，逾時關房，觀戰者�
   advance(30000);
   store.sweep();
   assert.ok(store.getRoom(res.code), '寬限期內房間要還在');
+  assert.strictEqual(events.filter((event) => event.type === 'closed').length, 0, '寬限期內不能廣播關房');
   assert.strictEqual(store.attachHost(res.code, res.hostToken).ok, true, '主持人可以憑 token 回來');
   assert.strictEqual(store.getRoom(res.code).hostOnline, true);
 
@@ -982,6 +985,10 @@ ok('房間生命週期：主持人斷線有寬限期，逾時關房，觀戰者�
   advance(60001);
   const closedCount = store.sweep();
   assert.strictEqual(closedCount, 1);
+  const closed = events.find((event) => event.type === 'closed');
+  assert.ok(closed, '主持人斷線逾時要廣播 closed 事件');
+  assert.strictEqual(closed.code, res.code);
+  assert.strictEqual(closed.payload.reason, 'hostgone', '關房廣播要標示主持人斷線逾時');
   assert.strictEqual(store.getRoom(res.code), null, '逾時要關房');
   assert.strictEqual(store.listRooms().length, 0);
   assert.strictEqual(store.addViewer(res.code, {}).status, 404, '關掉的房間不能再加入');
@@ -1111,7 +1118,7 @@ ok('線上相關畫面、狀態與設定都在 index.html 裡', () => {
   ['s-lobby', 's-watch', 'lobby-off', 'lobby-state', 'roomlist', 'watch-board',
     'watch-overlay', 'chat-panel', 'chat-log', 'chat-form', 'b-chat', 'chat-badge',
     'w-summary', 'watch-note-form', 'watch-note-input', 'watch-note-list', 'b-watch-note',
-    'hostbar', 'b-share', 'b-reinvite', 'b-close-room',
+    'hostbar', 'host-codebox', 'h-code', 'b-copy-room-code', 'b-share', 'b-reinvite', 'b-close-room',
     'settings-nick', 'settings-chatcue']
     .forEach((id) => assert.ok(html.includes('id="' + id + '"'), '缺少線上模式的元素：' + id));
   assert.ok(html.includes('js/online.js'), 'index.html 要載入 online.js');
@@ -1121,6 +1128,10 @@ ok('線上相關畫面、狀態與設定都在 index.html 裡', () => {
   assert.ok(/id="watch-board"[^>]*readonly|class="board readonly"/.test(html), '觀戰盤面要標示成唯讀');
   assert.ok(/aria-label="[^"]*唯讀[^"]*"/.test(html), '觀戰盤面要讓螢幕閱讀器知道是唯讀的');
   assert.ok(/maxlength="10"/.test(html), '共享格子留言要限制在 10 字內');
+  assert.ok(html.includes('aria-label="主持人房號"'), '主持人房號要有清楚的可讀標籤');
+  assert.ok(html.includes('複製主持人房號'), '主持人要能直接複製房號');
+  assert.ok(html.includes('開房模式：出題後會自動開一間觀戰房'), '開始新題目要直接進入開房模式');
+  assert.ok(!html.includes('id="b-open-room"'), '普通遊戲不需要額外的開放觀戰按鈕');
 });
 
 ok('觀戰者只能填格子留言與聊天：沒有數字盤、沒有遊戲提示', () => {

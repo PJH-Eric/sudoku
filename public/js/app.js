@@ -554,6 +554,7 @@
     q('pause-overlay').classList.remove('on');
     q('pause-overlay').setAttribute('aria-hidden', 'true');
     toggleNoteMode(false);
+    q('s-game').classList.toggle('hosting-room', hostMode);
     selected = firstEmpty();
     renderBoard();
     go('s-game');
@@ -892,6 +893,7 @@
       say(w.Online.disabledReason(), 'bad');
       return;
     }
+    q('s-game').classList.add('hosting-room');
     q('hostbar').hidden = false;
     q('h-code').textContent = '開房中…';
     q('h-viewers').textContent = '👀 0 人觀戰';
@@ -909,6 +911,7 @@
       if (err) {
         host = null;
         hostMode = false;
+        q('s-game').classList.remove('hosting-room');
         q('hostbar').hidden = true;
         setChatVisible(false);
         say('開房失敗：' + err.message, 'bad');
@@ -919,12 +922,11 @@
         code: data.code, token: data.hostToken, invite: data.inviteToken, viewers: 0,
         cellNotes: normalizeCellNotes()
       };
-      q('h-code').textContent = '房號 ' + host.code;
+      q('h-code').textContent = host.code;
       resetChat('房號 ' + host.code + '（你是主持人）');
       setChatVisible(true);
       w.Sound.play('join');
       say('房間開好了！房號 ' + host.code + '，按「分享連結」把它傳給朋友，他們就能進來看你解題。', 'good');
-      toast('房號 ' + host.code);
 
       w.Online.connect({
         code: host.code,
@@ -968,6 +970,7 @@
     var code = host.code;
     host = null;
     hostMode = false;
+    q('s-game').classList.remove('hosting-room');
     q('hostbar').hidden = true;
     setChatVisible(false);
     setChatOpen(false);
@@ -1015,6 +1018,21 @@
       return;
     }
     say('請手動複製這個觀戰連結：' + url, 'warn');
+  }
+
+  function copyRoomCode() {
+    if (!host) return;
+    var code = host.code;
+    if (w.navigator && w.navigator.clipboard && typeof w.navigator.clipboard.writeText === 'function') {
+      w.navigator.clipboard.writeText(code).then(function () {
+        toast('房號已複製');
+        say('房號 ' + code + ' 已複製，可以貼給朋友。', 'good');
+      }).catch(function () {
+        say('複製失敗，房號是 ' + code + '，請手動輸入給朋友。', 'warn');
+      });
+      return;
+    }
+    say('房號是 ' + code + '，請手動輸入給朋友。', 'warn');
   }
 
   function doReinvite() {
@@ -1665,6 +1683,7 @@
     });
 
     q('b-share').addEventListener('click', function () { w.Sound.play('click'); doShare(); });
+    q('b-copy-room-code').addEventListener('click', function () { w.Sound.play('click'); copyRoomCode(); });
     q('b-reinvite').addEventListener('click', function () { w.Sound.play('click'); doReinvite(); });
     q('b-close-room').addEventListener('click', function () {
       w.Sound.play('click');
@@ -1881,7 +1900,8 @@
 
     q('b-new').addEventListener('click', function () {
       w.Sound.play('click');
-      setHostMode(false);
+      /* 線上模式下開始新題目就直接成為主持人；沒有伺服器時仍維持單機遊戲。 */
+      setHostMode(w.Online.isEnabled());
       markDiff(pendingDifficulty);
       go('s-setup');
     });

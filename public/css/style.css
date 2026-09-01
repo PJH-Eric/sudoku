@@ -443,6 +443,15 @@ body{
 /* ---------- 開房中的主持人資訊列 ---------- */
 .hostbar{display:flex;align-items:center;gap:7px;justify-content:center;flex-wrap:wrap;padding:2px 12px 4px}
 .hostbar .btn3d.small{min-height:44px;font-size:.78rem;padding:7px 12px calc(7px + var(--d));--d:5px}
+.host-codebox{
+  display:flex;align-items:center;gap:9px;flex:0 1 auto;min-height:52px;padding:4px 8px 4px 13px;
+  background:var(--mint);border:3px solid var(--ink);border-radius:17px;box-shadow:0 5px 0 rgba(74,59,85,.14)
+}
+.host-code-label{font-size:.78rem;font-weight:900;color:var(--ink-soft);white-space:nowrap}
+.host-codebox #h-code{
+  color:var(--ink);font-size:1.35rem;font-weight:900;letter-spacing:.16em;line-height:1;white-space:nowrap
+}
+.host-codebox .host-code-copy{min-height:40px;font-size:.72rem;padding:6px 10px calc(6px + var(--d));--d:5px}
 .chip.live{background:var(--mint);border-color:var(--mint-d)}
 .chip[data-state=fail],.chip[data-state=failed]{background:#FFE1E6;border-color:#E39AA6;color:var(--danger)}
 .chip[data-state=retrying],.chip[data-state=waking],.chip[data-state=connecting]{background:var(--lemon);border-color:var(--lemon-d)}
@@ -578,8 +587,8 @@ body{
 }
 /* 矮橫向（手機橫拿）：把標題列與數據列併成同一排，把高度讓給盤面 */
 @media (orientation:landscape) and (max-height:520px){
-  .settings-fab{top:calc(5px + env(safe-area-inset-top));--d:5px}
-  .settings-fab.btn3d.icononly{min-height:46px;min-width:46px;padding:7px 10px calc(7px + var(--d))}
+  .settings-fab{top:calc(2px + env(safe-area-inset-top));--d:5px}
+  .settings-fab.btn3d.icononly{min-height:44px;min-width:44px;padding:6px 9px calc(6px + var(--d))}
   .gtop{display:flex;align-items:center;gap:8px;padding:4px 66px 0 8px}
   .gbar{flex:0 0 auto;padding:0;gap:6px}
   .statbar{flex:1;min-width:0;justify-content:flex-end;padding:0;gap:6px;flex-wrap:nowrap;overflow:hidden}
@@ -589,13 +598,20 @@ body{
   .stat .k{font-size:.64rem}
   .gamebody{padding:2px 7px 0;gap:8px}
   /* 右上角固定的設定鈕會壓在輸入區上方，這裡把它的高度讓出來 */
-  .padwrap{padding-top:calc(26px + env(safe-area-inset-top));min-height:0;overflow-y:auto}
+  .padwrap{padding-top:calc(26px + env(safe-area-inset-top));min-height:0;overflow-y:auto;justify-content:flex-start}
   .gfoot{padding:2px 10px calc(4px + env(safe-area-inset-bottom))}
   .feedback{min-height:1.7em;font-size:.74rem;padding:3px 8px;border-radius:11px}
   .numkey{min-height:44px;--d:6px}
   .numkey .nk{font-size:1.25rem}
   .tools .btn3d{min-height:44px;font-size:.74rem}
   .btn3d.small{min-height:42px}
+  /* 主持房間資訊不能和標題／統計擠在同一排，否則盤面會蓋到第二排按鈕 */
+  #s-game.hosting-room .gtop{display:block;padding:4px 66px 0 8px}
+  #s-game.hosting-room .gbar{display:flex;padding:0;gap:6px}
+  #s-game.hosting-room .statbar{display:flex;min-width:0;padding:0;gap:6px;justify-content:flex-end;flex-wrap:nowrap;overflow:hidden}
+  #s-game.hosting-room .hostbar{width:100%;box-sizing:border-box;padding:2px 0 3px}
+  #s-game.hosting-room.active{overflow-y:auto}
+  #s-game.hosting-room .gamebody{flex:0 0 280px;min-height:280px}
   /* 五張難度卡在矮橫向壓成一行式，維持 44px 以上命中區 */
   .diff-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .optcard{min-height:52px;padding:8px 10px;flex-direction:row;align-items:center;flex-wrap:wrap;gap:2px 8px}
@@ -689,6 +705,9 @@ body{
   .numkey .nk{font-size:1.3rem}
   .gfoot{padding:5px 8px calc(6px + env(safe-area-inset-bottom))}
   .feedback{font-size:.78rem;min-height:2.4em}
+  .hostbar{gap:6px;padding:4px 8px 6px}
+  .host-codebox{flex:1 1 100%;justify-content:center;min-height:54px;padding:5px 8px 5px 12px}
+  .host-codebox #h-code{font-size:1.25rem}
   .tut-foot{flex-direction:column}
   .panel.result{margin-top:2vh}
   .resstats .row{font-size:.85rem;padding:8px 11px}
