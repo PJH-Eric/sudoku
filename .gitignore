@@ -1,0 +1,21 @@
+# 相依套件
+node_modules/
+
+# 記錄檔
+*.log
+npm-debug.log*
+
+# 作業系統／編輯器
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+
+# 環境變數
+.env
+.env.local
+
+# 測試用的暫存瀏覽器設定檔
+.chrome-rwd-test/
+screenshots/

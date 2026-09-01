@@ -1,0 +1,17 @@
+{
+  "name": "sudoku",
+  "version": "1.0.0",
+  "description": "數獨小學堂 - 可愛風 9x9 數獨小遊戲（單機，四種難度、唯一解保證、種子出題）",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node tests/verify.js",
+    "test:browser": "node scripts/browser-check.js",
+    "verify": "node tests/verify.js && node scripts/browser-check.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

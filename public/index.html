@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#F4EEFF">
+<meta name="description" content="可愛風格的 9×9 數獨小遊戲：四種難度、唯一解保證、筆記、提示與可續玩進度。">
+<title>數獨小學堂</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='8' y='8' width='84' height='84' rx='16' fill='%23FFFDF8' stroke='%234A3B55' stroke-width='7'/%3E%3Cpath d='M36 10 V90 M64 10 V90 M10 36 H90 M10 64 H90' stroke='%234A3B55' stroke-width='4' opacity='.7'/%3E%3Crect x='12' y='12' width='22' height='22' rx='6' fill='%23C9B6F5'/%3E%3Crect x='39' y='39' width='22' height='22' rx='6' fill='%23A9E7D2'/%3E%3Crect x='66' y='66' width='22' height='22' rx='6' fill='%23FFE3A0'/%3E%3C/svg%3E">
+</head>
+<body>
+<div id="bgdeco" aria-hidden="true"></div>
+
+<div id="app">
+
+  <!-- 右上角固定設定入口：所有畫面共用同一顆按鈕，位置在安全區內 -->
+  <button class="btn3d icononly settings-fab" data-color="cream" id="b-settings" type="button"
+          title="開啟遊戲設定" aria-label="開啟遊戲設定" aria-haspopup="dialog"
+          aria-controls="settings-modal" aria-expanded="false">⚙</button>
+
+  <!-- ============ 主選單 ============ -->
+  <section class="screen flexcenter active" id="s-home" aria-label="主選單">
+    <div class="home-wrap">
+      <div class="logo" id="logo"></div>
+      <div class="home-btns">
+        <button class="btn3d big" data-color="grape" id="b-continue" hidden><span class="ico">▶</span>繼續上一題</button>
+        <button class="btn3d big" data-color="mint" id="b-new"><span class="ico">✏️</span>開始新題目</button>
+        <div class="home-row">
+          <button class="btn3d" data-color="lemon" id="b-stats"><span class="ico">🏅</span>我的紀錄</button>
+          <button class="btn3d" data-color="sky" id="b-help"><span class="ico">📖</span>玩法教學</button>
+        </div>
+      </div>
+      <p class="home-note" id="home-note">全部題目都保證只有一組答案，慢慢想不用急。</p>
+    </div>
+  </section>
+
+  <!-- ============ 難度選擇 ============ -->
+  <section class="screen" id="s-setup" aria-label="難度選擇">
+    <div class="panel">
+      <div class="panel-head">
+        <button class="btn3d small" data-color="cream" data-back="s-home">◀ 返回</button>
+        <h2>選擇難度</h2>
+        <span class="spacer"></span>
+      </div>
+
+      <div class="diff-row" id="opt-diff">
+        <button class="optcard" data-v="easy" type="button">
+          <b>簡單</b><span class="s">40 格左右提示</span>
+          <span class="t">只要用「唯一候選數」就能一路填完</span>
+        </button>
+        <button class="optcard" data-v="medium" type="button">
+          <b>普通</b><span class="s">30 格左右提示</span>
+          <span class="t">需要找出「這一宮只有這格放得下 X」</span>
+        </button>
+        <button class="optcard" data-v="hard" type="button">
+          <b>困難</b><span class="s">26 格左右提示</span>
+          <span class="t">需要區塊摒除、裸對等刪候選數的技巧</span>
+        </button>
+        <button class="optcard" data-v="expert" type="button">
+          <b>專家</b><span class="s">24 格左右提示</span>
+          <span class="t">基本技巧推不完，要靠假設與試誤</span>
+        </button>
+      </div>
+
+      <h3 class="lbl">題目種子（選填）</h3>
+      <div class="seed-row">
+        <input id="seed-input" maxlength="12" autocomplete="off" spellcheck="false"
+               placeholder="留白＝隨機出題" aria-label="題目種子，留白代表隨機出題">
+        <button class="btn3d small" data-color="cream" id="b-seed-random" type="button">🎲 換一組</button>
+      </div>
+      <p class="hint-note">輸入同一組種子＋同一個難度，永遠會拿到同一題，可以跟朋友比賽同一題。</p>
+
+      <div class="panel-foot">
+        <button class="btn3d big" data-color="grape" id="b-start">出題開始 ▶</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 載入中 ============ -->
+  <section class="screen flexcenter" id="s-loading" aria-label="出題中">
+    <div class="state-box">
+      <div class="spinner" aria-hidden="true"></div>
+      <h2>正在出題…</h2>
+      <p id="loading-note">正在挖洞並驗證這一題只有一組答案。</p>
+    </div>
+  </section>
+
+  <!-- ============ 錯誤 ============ -->
+  <section class="screen flexcenter" id="s-error" aria-label="發生錯誤">
+    <div class="state-box">
+      <div class="state-face" aria-hidden="true">😿</div>
+      <h2>出題失敗了</h2>
+      <p id="error-note">請再試一次，或換一個難度。</p>
+      <div class="state-btns">
+        <button class="btn3d" data-color="grape" id="b-retry">🔄 再試一次</button>
+        <button class="btn3d" data-color="cream" data-back="s-home">🏠 回主選單</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 遊戲畫面 ============ -->
+  <section class="screen" id="s-game" aria-label="遊戲進行中">
+    <div class="gtop">
+      <header class="gbar">
+        <button class="btn3d small" data-color="cream" id="b-quit">◀ 離開</button>
+        <div class="gmeta">
+          <span class="chip" id="g-diff">簡單</span>
+          <span class="chip ghost" id="g-seed">種子 —</span>
+          <span class="chip ghost" id="g-tech">唯一候選數</span>
+        </div>
+        <button class="btn3d small" data-color="lemon" id="b-pause" aria-label="暫停遊戲">⏸ 暫停</button>
+      </header>
+
+      <div class="statbar" id="statbar">
+        <div class="stat"><span class="k">時間</span><b id="st-time">00:00</b></div>
+        <div class="stat"><span class="k">剩餘</span><b id="st-left">0</b></div>
+        <div class="stat"><span class="k">提示</span><b id="st-hint">0</b></div>
+        <div class="stat"><span class="k">填錯</span><b id="st-miss">0</b></div>
+      </div>
+    </div>
+
+    <div class="gamebody">
+      <div class="boardwrap">
+        <div class="board" id="board" role="grid" aria-label="數獨盤面，9 列 9 行"></div>
+      </div>
+
+      <div class="padwrap">
+        <div class="tools" id="tools">
+          <button class="btn3d small tool" data-color="sky" id="b-note" type="button" aria-pressed="false">
+            <span class="ico">✎</span><span class="tx">筆記</span><span class="tag" id="note-tag">關</span>
+          </button>
+          <button class="btn3d small tool" data-color="cream" id="b-erase" type="button"><span class="ico">⌫</span><span class="tx">清除</span></button>
+          <button class="btn3d small tool" data-color="cream" id="b-undo" type="button"><span class="ico">↶</span><span class="tx">復原</span></button>
+          <button class="btn3d small tool" data-color="cream" id="b-redo" type="button"><span class="ico">↷</span><span class="tx">重做</span></button>
+          <button class="btn3d small tool" data-color="lemon" id="b-hint" type="button"><span class="ico">💡</span><span class="tx">提示</span></button>
+        </div>
+        <div class="numpad" id="numpad" role="group" aria-label="數字輸入盤"></div>
+      </div>
+    </div>
+
+    <footer class="gfoot">
+      <p class="feedback" id="feedback" role="status" aria-live="polite">點一個空格，再按下面的數字就能填入。</p>
+    </footer>
+
+    <div class="overlay" id="pause-overlay" aria-hidden="true">
+      <div class="ovbox" role="dialog" aria-modal="true" aria-labelledby="pause-title" tabindex="-1" id="pause-box">
+        <h2 id="pause-title">已暫停</h2>
+        <p>盤面先蓋起來了，計時也停住。</p>
+        <div class="state-btns">
+          <button class="btn3d" data-color="mint" id="b-resume">▶ 繼續</button>
+          <button class="btn3d" data-color="cream" id="b-restart">🔄 這題重來</button>
+          <button class="btn3d" data-color="cream" id="b-pausequit">🏠 回主選單</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="assertive"></div>
+  </section>
+
+  <!-- ============ 結算 ============ -->
+  <section class="screen" id="s-result" aria-label="完成結算">
+    <div class="panel result">
+      <div class="restrophy" id="res-trophy"></div>
+      <h2 id="res-title">完成了！</h2>
+      <p class="res-sub" id="res-sub">每一列、每一行、每一宮的 1 到 9 都湊齊了。</p>
+      <div class="resstats" id="res-stats"></div>
+      <div class="panel-foot col">
+        <button class="btn3d big" data-color="grape" id="b-again">同難度再一題 🔁</button>
+        <div class="home-row">
+          <button class="btn3d" data-color="cream" id="b-changediff">換難度</button>
+          <button class="btn3d" data-color="cream" id="b-home2">回主選單 🏠</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 我的紀錄 ============ -->
+  <section class="screen" id="s-stats" aria-label="我的紀錄">
+    <div class="panel">
+      <div class="panel-head">
+        <button class="btn3d small" data-color="cream" data-back="s-home">◀ 返回</button>
+        <h2>🏅 我的紀錄</h2>
+        <button class="btn3d small" data-color="cream" id="b-clearstats">清除</button>
+      </div>
+      <div class="ranklist" id="ranklist"></div>
+      <p class="hint-note">紀錄只存在這台裝置的瀏覽器裡，不需要帳號，也不會上傳。</p>
+    </div>
+  </section>
+
+  <!-- ============ 玩法教學（純文字） ============ -->
+  <section class="screen" id="s-help" aria-label="玩法教學">
+    <div class="panel">
+      <div class="panel-head">
+        <button class="btn3d small" data-color="cream" id="b-help-skip">跳過</button>
+        <h2>📖 玩法教學</h2>
+        <span class="spacer"></span>
+      </div>
+      <div class="tut">
+        <div class="tut-progress"><span id="tut-progress">第 1 段 / 共 7 段</span></div>
+        <h3 id="tut-title">目標是什麼？</h3>
+        <div class="tut-body" id="tut-body"></div>
+      </div>
+      <div class="tut-foot">
+        <button class="btn3d small" data-color="cream" id="b-tut-prev">◀ 上一段</button>
+        <button class="btn3d small" data-color="grape" id="b-tut-next">下一段 ▶</button>
+      </div>
+      <div class="panel-foot">
+        <button class="btn3d" data-color="mint" id="b-tut-play">立即練習一題（簡單）</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 遊戲設定彈窗 ============ -->
+  <div class="settings-modal" id="settings-modal" role="dialog" aria-modal="true"
+       aria-labelledby="settings-title" aria-hidden="true">
+    <div class="settings-backdrop" data-settings-close></div>
+    <section class="settings-panel" id="settings-panel" tabindex="-1">
+      <div class="settings-head">
+        <h2 id="settings-title">⚙ 遊戲設定</h2>
+        <button class="settings-close" id="settings-close" type="button" aria-label="關閉遊戲設定">✕</button>
+      </div>
+
+      <div class="settings-group">
+        <h3>聲音</h3>
+        <label class="setting-toggle" for="settings-music">
+          <span><b>背景音樂</b><small id="settings-music-status">開啟</small></span>
+          <input id="settings-music" type="checkbox" checked>
+        </label>
+        <label class="setting-range" for="settings-music-volume">
+          <span>音樂音量 <output id="settings-music-volume-value">70%</output></span>
+          <input id="settings-music-volume" type="range" min="0" max="100" step="5" value="70">
+        </label>
+        <label class="setting-toggle" for="settings-sfx">
+          <span><b>遊戲音效</b><small id="settings-sfx-status">開啟</small></span>
+          <input id="settings-sfx" type="checkbox" checked>
+        </label>
+        <label class="setting-range" for="settings-sfx-volume">
+          <span>音效音量 <output id="settings-sfx-volume-value">100%</output></span>
+          <input id="settings-sfx-volume" type="range" min="0" max="100" step="5" value="100">
+        </label>
+        <p class="settings-note" id="settings-audio-note">聲音會在你第一次點畫面之後才開始播放，這是瀏覽器的規定。</p>
+      </div>
+
+      <div class="settings-group">
+        <h3>操作</h3>
+        <label class="setting-toggle" for="settings-haptic">
+          <span><b>觸控震動</b><small>手機／平板填入數字時輕震一下</small></span>
+          <input id="settings-haptic" type="checkbox" checked>
+        </label>
+        <label class="setting-toggle" for="settings-motion">
+          <span><b>動畫效果</b><small>關閉可減少動態，適合會頭暈的人</small></span>
+          <input id="settings-motion" type="checkbox" checked>
+        </label>
+        <label class="setting-toggle" for="settings-autonotes">
+          <span><b>自動整理筆記</b><small>填入數字後自動清掉同列行宮的相同筆記</small></span>
+          <input id="settings-autonotes" type="checkbox" checked>
+        </label>
+      </div>
+
+      <div class="settings-group">
+        <h3>盤面顯示</h3>
+        <label class="setting-toggle" for="settings-mistakes">
+          <span><b>即時標示填錯</b><small>關閉後要自己檢查，難度更高</small></span>
+          <input id="settings-mistakes" type="checkbox" checked>
+        </label>
+        <label class="setting-toggle" for="settings-same">
+          <span><b>高亮相同數字</b><small>點一格時，同樣的數字一起變色</small></span>
+          <input id="settings-same" type="checkbox" checked>
+        </label>
+        <label class="setting-toggle" for="settings-units">
+          <span><b>高亮同列行宮</b><small>讓相關的格子淡淡打亮</small></span>
+          <input id="settings-units" type="checkbox" checked>
+        </label>
+        <label class="setting-toggle" for="settings-remaining">
+          <span><b>數字盤顯示剩餘</b><small>每個數字還有幾格沒填</small></span>
+          <input id="settings-remaining" type="checkbox" checked>
+        </label>
+      </div>
+
+      <div class="settings-group">
+        <h3>連線</h3>
+        <div class="setting-static">
+          <span><b>遊戲伺服器</b><small id="settings-server-url">未設定（單機模式）</small></span>
+          <span class="server-pill" id="settings-server-state" role="status" aria-live="polite">單機</span>
+        </div>
+        <p class="settings-note" id="settings-server-note">這是單機遊戲，沒有伺服器也能完整遊玩；成績與進度都存在這台裝置上。</p>
+      </div>
+      <div class="settings-foot">
+        <button class="settings-reset" id="settings-reset" type="button">恢復預設</button>
+        <button class="settings-done" id="settings-done" type="button">完成</button>
+      </div>
+    </section>
+  </div>
+
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/rng.js"></script>
+<script src="js/sudoku.js"></script>
+<script src="js/game.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/svgui.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

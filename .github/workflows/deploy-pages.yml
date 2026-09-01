@@ -1,0 +1,45 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      # 這是純單機遊戲，public/ 本身就能直接上線。
+      # server URL 不進版控：若 repository variable 有設定 GAME_SERVER_URL，
+      # 就在部署當下注入 public/js/config.js；沒設定就維持單機模式。
+      # 設定位置：Settings → Secrets and variables → Actions → Variables → GAME_SERVER_URL
+      - name: Inject server URL
+        env:
+          GAME_SERVER_URL: ${{ vars.GAME_SERVER_URL }}
+        run: node scripts/inject-server-url.js
+
+      - name: Upload public/ as artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
