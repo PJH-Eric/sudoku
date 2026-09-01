@@ -164,7 +164,7 @@
 
     <div class="gamebody watchbody">
       <div class="boardwrap">
-        <div class="board readonly" id="watch-board" role="grid" aria-label="觀戰盤面，主持人盤面唯讀，可點格子查看或填寫共享備註"></div>
+        <div class="board readonly" id="watch-board" role="grid" aria-label="觀戰盤面，主持人盤面唯讀，可點格子查看或填寫共享格子留言"></div>
       </div>
 
       <!-- 操作 Summary：寬版放在右半邊，窄版收合成一段可展開的摘要 -->
@@ -182,19 +182,19 @@
           <div class="sum-row"><span>目前進度</span><b id="sum-progress">—</b></div>
           <div class="sum-row"><span>主持人動態</span><b id="sum-activity">等待第一筆盤面…</b></div>
           <p class="sum-note" id="sum-goal">目標：把每一列、每一行、每一宮的 1–9 各填一次。</p>
-          <section class="watch-note-tools" id="watch-note-tools" aria-label="共享格子備註">
+          <section class="watch-note-tools" id="watch-note-tools" aria-label="共享格子留言">
             <div class="watch-note-head">
-              <h3>共享格子備註</h3>
+              <h3>共享格子留言</h3>
               <b id="watch-note-cell">尚未選格</b>
             </div>
-            <p class="watch-note-help" id="watch-note-help">點盤面右上角的小三角形或任一格，就能查看這格備註；你也可以留下最多 10 個字，玩家和其他觀戰者都看得到。</p>
+            <p class="watch-note-help" id="watch-note-help">點盤面右上角的小三角形或任一格，就能查看這格留言；每次送出都會新增一則最多 10 個字的留言，玩家和其他觀戰者都看得到。</p>
             <form class="watch-note-form" id="watch-note-form" autocomplete="off">
-              <label class="sr-only" for="watch-note-input">這格的共享備註</label>
-              <input id="watch-note-input" maxlength="10" placeholder="這格備註（10字內）" enterkeyhint="send">
-              <button class="btn3d small" data-color="grape" id="b-watch-note" type="submit">送出備註</button>
+              <label class="sr-only" for="watch-note-input">這格的共享留言</label>
+              <input id="watch-note-input" maxlength="10" placeholder="這格留言（10字內）" enterkeyhint="send">
+              <button class="btn3d small" data-color="grape" id="b-watch-note" type="submit">送出留言</button>
             </form>
-            <div class="watch-note-list" id="watch-note-list" role="log" aria-live="polite" aria-label="目前格子的共享備註"></div>
-            <p class="watch-note-limit">送出空白會移除你在這格的備註；觀戰者不能填數字或改動主持人的盤面。</p>
+            <div class="watch-note-list" id="watch-note-list" role="log" aria-live="polite" aria-label="目前格子的共享留言"></div>
+            <p class="watch-note-limit">每格會保留留言歷史；觀戰者不能填數字或改動主持人的盤面。</p>
           </section>
         </div>
       </aside>

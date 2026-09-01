@@ -8,8 +8,8 @@
  *   - 六種尺寸／方向下：不可水平溢出、右上角設定按鈕在安全區內且夠大、按鈕命中區足夠
  *   - 完整一局：選難度 → 出題 → 點格子填數字 → 暫停 → 繼續 → 解到勝利 → 結算
  *   - 設定彈窗：開啟、焦點、Escape 關閉、焦點歸位、靜音設定會被保存
- *   - 每格右上角共享備註三角形可以展開備註區
- *   - 線上觀戰者可以輸入共享備註，且不會出現數字輸入／遊戲提示
+ *   - 每格右上角格子留言三角形可以展開留言區
+ *   - 線上觀戰者可以輸入格子留言，且不會出現數字輸入／遊戲提示
  *   - 重新載入後可以續玩
  *   - server URL 參數化：單機／已連線／設定錯誤／連不上
  * 螢幕截圖會存到 screenshots/。
@@ -363,10 +363,12 @@ async function main() {
     const noteChrome = JSON.parse(await cdp.eval(
       "var corner=document.querySelector('#board .cell .cell-note-corner');" +
       "if(corner) corner.click();" +
+      "var cs=corner ? getComputedStyle(corner) : null;" +
       "return JSON.stringify({corners:document.querySelectorAll('#board .cell .cell-note-corner').length," +
+      "size:cs ? Math.max(parseFloat(cs.width),parseFloat(cs.height)) : 0," +
       "open:!!corner && !corner.parentNode.querySelector('.cell-note-popover').hidden});"
     ));
-    check('每格都有右上角備註三角形且可展開', noteChrome.corners === 81 && noteChrome.open, JSON.stringify(noteChrome));
+    check('每格都有右上角小型格子留言三角形且可展開', noteChrome.corners === 81 && noteChrome.size <= 18 && noteChrome.open, JSON.stringify(noteChrome));
     await shot(v.name + '-5-遊戲中');
 
     /* 暫停 */
@@ -685,7 +687,7 @@ async function main() {
   const pl = JSON.parse(playable);
   check('連不上伺服器時照樣出得了題（單機不受影響）', pl.given > 0 && pl.unique === 1, playable);
 
-  /* ---------- 線上觀戰者 UI：只允許共享備註與聊天室 ---------- */
+  /* ---------- 線上觀戰者 UI：只允許格子留言與聊天室 ---------- */
   await setViewport(VIEWPORTS[1]);
   await goto(BASE + '?server=' + encodeURIComponent('http://127.0.0.1:' + PORT) +
     '&room=' + encodeURIComponent(onlineRoom.code) + '&invite=' + encodeURIComponent(onlineRoom.inviteToken));
@@ -698,7 +700,7 @@ async function main() {
     "numpad:!!document.querySelector('#s-watch .numpad'),hint:!!document.querySelector('#s-watch #b-hint')," +
     "cellTag:document.querySelector('#watch-board .cell').tagName});"
   ));
-  check('觀戰者畫面每格都有備註三角形，且沒有數字盤／遊戲提示',
+  check('觀戰者畫面每格都有格子留言三角形，且沒有數字盤／遊戲提示',
     watchUi.ready && watchUi.corners === 81 && watchUi.input === 10 && !watchUi.numpad && !watchUi.hint && watchUi.cellTag === 'DIV', JSON.stringify(watchUi));
   const noteUi = JSON.parse(await cdp.eval(
     "var c=document.querySelector('#watch-board .cell[data-i=\"80\"]'); c.click();" +
@@ -707,13 +709,23 @@ async function main() {
     "return JSON.stringify({selected:c.classList.contains('watch-sel'),cell:c.getAttribute('data-i'),value:i.value});"
   ));
   const noteAppeared = await waitForPage("document.querySelector('#watch-board .cell[data-i=\"80\"]').classList.contains('has-shared-notes')", 5000);
+  await sleep(500);
+  await cdp.eval(
+    "var i=document.getElementById('watch-note-input'); i.value='再看一眼';" +
+    "document.getElementById('watch-note-form').requestSubmit(); return 1;"
+  );
+  const secondNoteAppeared = await waitForPage(
+    "document.querySelector('#watch-board .cell[data-i=\"80\"] .cell-note-count').textContent === '2'", 5000
+  );
   const popover = JSON.parse(await cdp.eval(
     "var c=document.querySelector('#watch-board .cell[data-i=\"80\"] .cell-note-corner'); c.click();" +
     "var p=c.parentNode.querySelector('.cell-note-popover');" +
     "return JSON.stringify({open:!p.hidden,text:p.textContent});"
   ));
-  check('觀戰者可以送出 10 字內共享備註', noteUi.selected && noteUi.cell === '80' && noteAppeared, JSON.stringify({ ui: noteUi, appeared: noteAppeared }));
-  check('點右上角三角形會顯示共享備註內容', popover.open && popover.text.indexOf('可能是7') >= 0, JSON.stringify(popover));
+  check('觀戰者可以連續新增 10 字內格子留言', noteUi.selected && noteUi.cell === '80' && noteAppeared && secondNoteAppeared,
+    JSON.stringify({ ui: noteUi, appeared: noteAppeared, second: secondNoteAppeared }));
+  check('點右上角三角形會顯示格子留言歷史', popover.open && popover.text.indexOf('可能是7') >= 0 && popover.text.indexOf('再看一眼') >= 0,
+    JSON.stringify(popover));
 
   /* ---------- 收尾 ---------- */
   try { ws.close(); } catch (e) {}
@@ -722,7 +734,7 @@ async function main() {
   await sleep(300);
 
   console.log('\n螢幕截圖已存到：' + SHOTS);
-  if (notes.length) notes.forEach((n) => console.log('備註：' + n));
+  if (notes.length) notes.forEach((n) => console.log('格子留言：' + n));
   if (failures.length) {
     console.log('\n共 ' + failures.length + ' 項未通過：');
     failures.forEach((f) => console.log('  - ' + f));

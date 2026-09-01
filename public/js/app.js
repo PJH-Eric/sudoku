@@ -182,7 +182,7 @@
     corner.className = 'cell-note-corner';
     corner.setAttribute('role', 'button');
     corner.setAttribute('tabindex', '-1');
-    corner.setAttribute('aria-label', '查看這格的共享備註');
+    corner.setAttribute('aria-label', '查看這格的格子留言');
     var count = D.createElement('span');
     count.className = 'cell-note-count';
     corner.appendChild(count);
@@ -193,7 +193,7 @@
     popover.setAttribute('role', 'status');
     var title = D.createElement('b');
     title.className = 'cell-note-popover-title';
-    title.textContent = '共享備註';
+    title.textContent = '格子留言';
     var items = D.createElement('span');
     items.className = 'cell-note-items';
     popover.appendChild(title);
@@ -305,7 +305,7 @@
       renderCellNotes(el, host, i, hostNoteOpenIndex === i);
       var shared = notesFor(host, i);
       el.setAttribute('aria-label', cellLabel(i, v, mask, conflicts[i], wrong && wrong[i]) +
-        (shared.length ? '，有 ' + shared.length + ' 則共享備註' : ''));
+        (shared.length ? '，有 ' + shared.length + ' 則格子留言' : ''));
     }
     renderStatus();
   }
@@ -673,7 +673,7 @@
    *
    * 角色只有兩種，權限差很多：
    *   主持人（host）：照常解題，盤面會被推送出去；可以分享／換連結、關房。
-   *   觀戰者（watch）：只收盤面、共享格子備註與聊天室；不能填數字、不能用提示、不能改房間設定。
+   *   觀戰者（watch）：只收盤面、共享格子留言與聊天室；不能填數字、不能用提示、不能改房間設定。
    *
    * 盤面資料一律走 SudokuGame.spectatorSnapshot / spectatorView，
    * 衝突、剩餘數量都由觀戰端用同一份 sudoku.js 算，規則核心沒有第二套。
@@ -1103,14 +1103,14 @@
     corner.classList.toggle('has-notes', list.length > 0);
     count.textContent = list.length ? String(list.length) : '';
     corner.setAttribute('aria-label', list.length
-      ? '查看這格的 ' + list.length + ' 則共享備註'
-      : '查看這格的共享備註，目前沒有內容');
+      ? '查看這格的 ' + list.length + ' 則格子留言'
+      : '查看這格的格子留言，目前沒有內容');
     popover.hidden = !open;
     while (items.firstChild) items.removeChild(items.firstChild);
     if (!list.length) {
       var empty = D.createElement('span');
       empty.className = 'cell-note-empty';
-      empty.textContent = '目前沒有共享備註';
+      empty.textContent = '目前沒有格子留言';
       items.appendChild(empty);
       return;
     }
@@ -1148,14 +1148,13 @@
     var list = notesFor(watch, index);
     label.textContent = S.cellName(index);
     if (D.activeElement !== input) {
-      var mine = list.find(function (note) { return note.authorId === noteAuthorId(); });
-      input.value = mine ? mine.text : '';
+      input.value = '';
     }
     while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
     if (!list.length) {
       var empty = D.createElement('p');
       empty.className = 'watch-note-empty';
-      empty.textContent = '這格目前還沒有共享備註。';
+      empty.textContent = '這格目前還沒有格子留言。';
       listEl.appendChild(empty);
       return;
     }
@@ -1206,7 +1205,7 @@
       var shared = notesFor(watch, i);
       el.setAttribute('aria-label', '第 ' + (S.ROW_OF[i] + 1) + ' 列第 ' + (S.COL_OF[i] + 1) + ' 行，' +
         (v ? (view.given[i] ? '題目給的 ' : '') + v : '空格') +
-        (shared.length ? '，有 ' + shared.length + ' 則共享備註' : '，可查看或填寫共享備註'));
+        (shared.length ? '，有 ' + shared.length + ' 則格子留言' : '，可查看或填寫格子留言'));
     }
     renderWatchNotePanel();
   }
@@ -1307,7 +1306,7 @@
       showWatchOverlay('failed', detail || '連不上伺服器。可能是網路斷了，或伺服器正在休眠。');
     } else if (st === 'open') {
       hideWatchOverlay();
-      setWatchFeedback('觀戰中：主持人的盤面唯讀；你可以點格子填共享備註，大家都看得到。', 'good');
+      setWatchFeedback('觀戰中：主持人的盤面唯讀；你可以點格子填格子留言，大家都看得到。', 'good');
     } else if (st === 'retrying' || st === 'waking' || st === 'connecting') {
       setWatchFeedback(CONN_TEXT[st], 'warn');
     }
@@ -1360,29 +1359,33 @@
 
   function submitWatchNote() {
     if (!watch || !watch.view || watch.selected < 0) {
-      setWatchFeedback('請先點一格，再輸入共享備註。', 'warn');
+      setWatchFeedback('請先點一格，再輸入格子留言。', 'warn');
       return;
     }
     var input = q('watch-note-input');
     var text = input.value;
     if (text.length > 10) {
-      setWatchFeedback('每格備註最多 10 個字。', 'bad');
+      setWatchFeedback('每則格子留言最多 10 個字。', 'bad');
+      return;
+    }
+    if (!text.trim()) {
+      setWatchFeedback('請輸入留言內容；每次送出都會新增一則。', 'warn');
       return;
     }
     setWatchNoteEnabled(false);
-    setWatchFeedback(text.trim() ? '共享備註送出中…' : '正在移除你在這格的備註…', '');
+    setWatchFeedback('格子留言送出中…', '');
     w.Online.sendNote(watch.selected, text, nickOrDefault(), function (err) {
       var open = w.Online.connState() === 'open';
       setWatchNoteEnabled(open);
       if (err) {
-        setWatchFeedback('備註沒有送出去：' + err.message, 'bad');
+        setWatchFeedback('格子留言沒有送出去：' + err.message, 'bad');
         w.Sound.play('blocked');
         return;
       }
       input.value = '';
       renderWatchNotePanel();
-      setWatchFeedback(text.trim() ? '備註已同步，玩家和其他觀戰者都看得到。' : '你在這格的備註已移除。', 'good');
-      w.Sound.play(text.trim() ? 'note' : 'clear');
+      setWatchFeedback('格子留言已新增，玩家和其他觀戰者都看得到。', 'good');
+      w.Sound.play('note');
     });
   }
 

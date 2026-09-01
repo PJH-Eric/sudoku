@@ -287,16 +287,16 @@ body{
 .cell .nt i{font-style:normal;font-size:calc(var(--bs,320px) / 9 * .25);line-height:1;color:transparent;display:flex;align-items:center;justify-content:center;font-weight:800}
 .cell .nt i.on{color:var(--ink-soft)}
 
-/* 每格右上角的小三角形：點它只展開共享備註，不會改動數獨盤面 */
-.cell-note-corner{position:absolute;z-index:6;top:0;right:0;width:24px;height:24px;cursor:pointer;
+/* 每格右上角的小三角形：點它只展開格子留言，不會改動數獨盤面 */
+.cell-note-corner{position:absolute;z-index:6;top:0;right:0;width:16px;height:16px;cursor:pointer;
   opacity:.42;transition:opacity .12s;}
 .cell-note-corner::before{content:"";position:absolute;inset:0;
-  border-top:22px solid var(--line);border-left:22px solid transparent;}
+  border-top:15px solid var(--line);border-left:15px solid transparent;}
 .cell-note-corner.has-notes{opacity:1}
 .cell-note-corner.has-notes::before{border-top-color:var(--grape)}
 .cell-note-corner:hover,.cell-note-corner:focus-visible{opacity:1}
-.cell-note-corner:focus-visible{outline:2px solid var(--sky-d);outline-offset:-2px}
-.cell-note-count{position:absolute;z-index:1;top:2px;right:3px;color:#fff;font-size:7px;line-height:1;font-weight:900;}
+.cell-note-corner:focus-visible{outline:1px solid var(--sky-d);outline-offset:-1px}
+.cell-note-count{position:absolute;z-index:1;top:1px;right:2px;color:#fff;font-size:6px;line-height:1;font-weight:900;}
 .cell-note-popover{position:absolute;z-index:30;top:calc(100% + 3px);left:-4px;
   display:flex;flex-direction:column;gap:4px;min-width:142px;max-width:min(220px,42vw);
   padding:7px 8px;background:var(--paper);border:3px solid var(--ink);border-radius:11px;

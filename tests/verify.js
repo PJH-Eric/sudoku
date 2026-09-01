@@ -885,7 +885,7 @@ ok('聊天：長度上限、頻率限制、訊息淨化，而且只有房內成�
   assert.strictEqual(impersonate.message.role, 'viewer', '角色由 token 決定，不看送過來的名字');
 });
 
-ok('共享格子備註：每位成員可各留一則，玩家與所有觀戰者都能收到', () => {
+ok('共享格子留言：同一格可持續新增多則，玩家與所有觀戰者都能收到', () => {
   const { store, advance } = makeStore();
   const res = openRoom(store);
   const a = store.addViewer(res.code, { name: '觀眾甲' });
@@ -898,25 +898,28 @@ ok('共享格子備註：每位成員可各留一則，玩家與所有觀戰者�
   assert.strictEqual(first.notes.length, 1);
   assert.strictEqual(first.notes[0].text, '可能是7');
   assert.strictEqual(first.notes[0].authorId, a.viewerId);
-  assert.ok(JSON.stringify(first).indexOf(a.viewerToken) < 0, '共享備註不可以外洩 viewer token');
+  assert.ok(JSON.stringify(first).indexOf(a.viewerToken) < 0, '共享留言不可以外洩 viewer token');
 
   const second = store.updateCellNote(res.code, b.viewerToken, 80, '先看宮', '觀眾乙');
   assert.strictEqual(second.ok, true);
-  assert.strictEqual(second.notes.length, 2, '不同觀戰者的備註要並存');
-  assert.strictEqual(events.length, 2, '每次備註都要廣播 note 事件');
+  assert.strictEqual(second.notes.length, 2, '不同觀戰者的留言要並存');
+  assert.strictEqual(events.length, 2, '每次留言都要廣播 note 事件');
   assert.strictEqual(store.stateEvent(store.getRoom(res.code)).cellNotes[80].length, 2,
-    '新的觀戰者初始 state 要拿到共享備註');
+    '新的觀戰者初始 state 要拿到共享留言');
 
   advance(Rooms.DEFAULTS.noteMinIntervalMs + 1);
-  const edited = store.updateCellNote(res.code, a.viewerToken, 80, '答案7', '觀眾甲');
-  assert.strictEqual(edited.ok, true);
-  assert.strictEqual(edited.notes.length, 2, '同一人的更新不應增加重複備註');
-  assert.strictEqual(edited.notes.find((note) => note.authorId === a.viewerId).text, '答案7');
+  const another = store.updateCellNote(res.code, a.viewerToken, 80, '答案7', '觀眾甲');
+  assert.strictEqual(another.ok, true);
+  assert.strictEqual(another.notes.length, 3, '同一人再次送出也要新增一則留言');
+  assert.deepStrictEqual(another.notes.map((note) => note.text), ['可能是7', '先看宮', '答案7']);
+  assert.strictEqual(events.length, 3, '同一人再次送出也要廣播新的 note 事件');
 
   advance(Rooms.DEFAULTS.noteMinIntervalMs + 1);
-  const removed = store.updateCellNote(res.code, a.viewerToken, 80, '', '觀眾甲');
-  assert.strictEqual(removed.ok, true);
-  assert.strictEqual(removed.notes.length, 1, '送出空白要移除自己的備註');
+  const empty = store.updateCellNote(res.code, a.viewerToken, 80, '', '觀眾甲');
+  assert.strictEqual(empty.ok, false, '空白內容不應產生沒有文字的留言');
+  assert.strictEqual(empty.code, 'empty');
+  assert.strictEqual(store.stateEvent(store.getRoom(res.code)).cellNotes[80].length, 3,
+    '拒絕空白後既有留言要保留');
 
   const tooLong = store.updateCellNote(res.code, b.viewerToken, 80, '一二三四五六七八九十 一', '觀眾乙');
   assert.strictEqual(tooLong.ok, false);
@@ -927,7 +930,7 @@ ok('共享格子備註：每位成員可各留一則，玩家與所有觀戰者�
 
   advance(Rooms.DEFAULTS.noteMinIntervalMs + 1);
   const hostNote = store.updateCellNote(res.code, res.hostToken, 0, '主持人提示', '冒充名稱');
-  assert.strictEqual(hostNote.ok, true, '主持人也能留下共享備註');
+  assert.strictEqual(hostNote.ok, true, '主持人也能留下共享留言');
   assert.strictEqual(hostNote.notes[0].role, 'host');
   assert.strictEqual(hostNote.notes[0].name, '小明');
   assert.strictEqual(store.stateEvent(store.getRoom(res.code)).cellNotes[0][0].text, '主持人提示');
@@ -1087,7 +1090,7 @@ ok('前端：連線層集中在 online.js，聊天一律用 textContent 顯示',
   const online = read(path.join(publicDir, 'js', 'online.js'));
   assert.ok(/w\.GameConfig|C\.url/.test(online), 'online.js 要從 GameConfig 取得連線位置');
   assert.ok(/EventSource/.test(online), '下行要用 SSE');
-  assert.ok(/sendNote/.test(online), '線上連線層要提供共享備註上行');
+  assert.ok(/sendNote/.test(online), '線上連線層要提供共享留言上行');
   assert.ok(/MAX_STREAM_RETRIES/.test(online), '重試要有上限，不可以無限轉圈');
   assert.ok(/disabledReason/.test(online), '線上功能沒啟用時要說明原因');
 
@@ -1097,7 +1100,7 @@ ok('前端：連線層集中在 online.js，聊天一律用 textContent 顯示',
   assert.ok(!/innerHTMLs*=/.test(chatBlock), '聊天訊息不可以用 innerHTML');
   assert.ok(/tx\.textContent = msg\.text/.test(chatBlock), '訊息內容必須用 textContent');
   assert.ok(/who\.textContent/.test(chatBlock), '暱稱必須用 textContent');
-  assert.ok(/text\.textContent = note\.text/.test(appSource), '格子備註內容必須用 textContent');
+  assert.ok(/text\.textContent = note\.text/.test(appSource), '格子留言內容必須用 textContent');
 
   const cardBlock = appSource.slice(appSource.indexOf('function roomCard'), appSource.indexOf('function agoText'));
   assert.ok(!/innerHTMLs*=/.test(cardBlock), '房間卡片不可以用 innerHTML');
@@ -1117,10 +1120,10 @@ ok('線上相關畫面、狀態與設定都在 index.html 裡', () => {
   assert.ok(onlineAt < appAt, 'online.js 要在 app.js 之前載入');
   assert.ok(/id="watch-board"[^>]*readonly|class="board readonly"/.test(html), '觀戰盤面要標示成唯讀');
   assert.ok(/aria-label="[^"]*唯讀[^"]*"/.test(html), '觀戰盤面要讓螢幕閱讀器知道是唯讀的');
-  assert.ok(/maxlength="10"/.test(html), '共享格子備註要限制在 10 字內');
+  assert.ok(/maxlength="10"/.test(html), '共享格子留言要限制在 10 字內');
 });
 
-ok('觀戰者只能備註與聊天：沒有數字盤、沒有遊戲提示', () => {
+ok('觀戰者只能填格子留言與聊天：沒有數字盤、沒有遊戲提示', () => {
   const watchStart = html.indexOf('id="s-watch"');
   const watchEnd = html.indexOf('<!-- ============ 遊戲畫面', watchStart) >= 0
     ? html.indexOf('<!-- ============ 遊戲畫面', watchStart)
@@ -1129,8 +1132,8 @@ ok('觀戰者只能備註與聊天：沒有數字盤、沒有遊戲提示', () =
   assert.ok(watchHtml.indexOf('numpad') < 0, '觀戰畫面不可以有數字輸入盤');
   assert.ok(watchHtml.indexOf('b-hint') < 0, '觀戰畫面不可以有提示按鈕');
   assert.ok(watchHtml.indexOf('b-note') < 0, '觀戰畫面不可以有筆記按鈕');
-  assert.ok(watchHtml.indexOf('b-watch-note') >= 0, '觀戰畫面要有共享備註送出入口');
-  assert.ok(/cell-note-corner/.test(appSource), '每個格子要有右上角共享備註三角形');
+  assert.ok(watchHtml.indexOf('b-watch-note') >= 0, '觀戰畫面要有共享留言送出入口');
+  assert.ok(/cell-note-corner/.test(appSource), '每個格子要有右上角格子留言三角形');
   /* 觀戰盤面的格子是 div，不是可以按的 button */
   assert.ok(/watchCells\.push\(cell\)/.test(appSource) && /D\.createElement\('div'\)/.test(appSource),
     '觀戰盤面的格子要用 div，不可以做成可點的按鈕');

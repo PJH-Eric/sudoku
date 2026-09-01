@@ -3,7 +3,7 @@
  * 執行：npm run test:online
  *
  * 使用兩個獨立 SSE 用戶端，不依賴瀏覽器或外部套件，檢查：
- *   開房 → 主持人／多位觀戰者連線 → 盤面廣播 → 共享格子備註 → 留言 → 邀請撤銷 → 關房通知。
+ *   開房 → 主持人／多位觀戰者連線 → 盤面廣播 → 格子留言 → 聊天 → 邀請撤銷 → 關房通知。
  */
 'use strict';
 
@@ -196,6 +196,22 @@ async function main() {
     viewer2.waitFor('note', (data) => data.index === 80 && data.notes[0].text === '可能是7')
   ]);
 
+  await sleep(450);
+  const notedAgain = await jsonRequest(base + '/api/rooms/' + room.code + '/note', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: viewerWelcome.token, index: 80, text: '再看一眼', name: '觀戰者甲' })
+  });
+  assert.strictEqual(notedAgain.res.status, 200);
+  assert.strictEqual(notedAgain.data.ok, true);
+  assert.strictEqual(notedAgain.data.notes.length, 2);
+  assert.strictEqual(notedAgain.data.notes[1].text, '再看一眼');
+  await Promise.all([
+    host.waitFor('note', (data) => data.index === 80 && data.notes.length === 2 && data.notes[1].text === '再看一眼'),
+    viewer.waitFor('note', (data) => data.index === 80 && data.notes.length === 2 && data.notes[1].text === '再看一眼'),
+    viewer2.waitFor('note', (data) => data.index === 80 && data.notes.length === 2 && data.notes[1].text === '再看一眼')
+  ]);
+
   const chatted = await jsonRequest(base + '/api/rooms/' + room.code + '/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -233,7 +249,7 @@ async function main() {
   host.close();
   viewer.close();
   viewer2.close();
-  console.log('線上端到端檢查全部通過（主持人＋多位觀戰者 SSE、盤面、共享備註、留言、邀請撤銷、關房）。');
+  console.log('線上端到端檢查全部通過（主持人＋多位觀戰者 SSE、盤面、格子留言、聊天、邀請撤銷、關房）。');
 }
 
 main().catch((error) => {

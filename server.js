@@ -5,7 +5,7 @@
  *
  * 兩件事：
  *   1. 把 public/ 底下的檔案送出去（單機遊戲本體，沒有伺服器也能玩）。
- *   2. 提供線上觀戰用的 API：房間列表、開房、盤面廣播、共享格子備註、聊天。
+ *   2. 提供線上觀戰用的 API：房間列表、開房、盤面廣播、格子留言、聊天。
  *
  * 傳輸方式刻意選「SSE（下行）＋ POST（上行）」而不是 WebSocket：
  *   - 專案維持零外部套件（Node 內建沒有 WebSocket 伺服器，用 ws 就得加相依）。
@@ -20,7 +20,7 @@
  *   GET  /api/rooms/:code             單一房間資訊（加入前先確認房間還在）
  *   GET  /api/rooms/:code/stream      SSE：state / note / chat / presence / closed / 心跳
  *   POST /api/rooms/:code/state       主持人更新盤面（需要 hostToken）
- *   POST /api/rooms/:code/note        成員更新一格共享備註（需要 hostToken 或 viewerToken）
+ *   POST /api/rooms/:code/note        成員新增一則共享格子留言（需要 hostToken 或 viewerToken）
  *   POST /api/rooms/:code/chat        送出訊息（需要 hostToken 或 viewerToken）
  *   POST /api/rooms/:code/close       主持人關房（需要 hostToken）
  *   POST /api/rooms/:code/invite      重新產生邀請連結，舊連結立刻失效（需要 hostToken）
