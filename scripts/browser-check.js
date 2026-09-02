@@ -744,6 +744,20 @@ async function main() {
     hostMobileUi.boxWidth > 0 && hostMobileUi.boxHeight > 0 && hostMobileUi.codeWidth > 0 && hostMobileUi.codeHeight > 0, JSON.stringify(hostMobileUi));
   await shot('房主開房-390x844');
 
+  const desktopWide = { name: '桌機超寬短版', width: 1869, height: 815, mobile: false, dsf: 1 };
+  await setViewport(desktopWide);
+  await sleep(200);
+  const hostDesktopUi = JSON.parse(await cdp.eval(
+    "var gameBody=document.querySelector('#s-game .gamebody').getBoundingClientRect();" +
+    "var desktopBoard=document.querySelector('#s-game #board').getBoundingClientRect();" +
+    "var desktopPad=document.querySelector('#s-game .padwrap').getBoundingClientRect();" +
+    "return JSON.stringify({viewportWidth:window.innerWidth,bodyWidth:gameBody.width,boardWidth:desktopBoard.width," +
+    "boardLeft:desktopBoard.left,boardRight:desktopBoard.right,padLeft:desktopPad.left,padRight:desktopPad.right," +
+    "gap:desktopPad.left-desktopBoard.right});"
+  ));
+  check('桌機棋盤與輸入區不留大片空白', hostDesktopUi.viewportWidth === desktopWide.width && hostDesktopUi.gap <= 72,
+    JSON.stringify(hostDesktopUi));
+
   await cdp.eval(
     "var hintCount=0; while(document.getElementById('s-result').classList.contains('active')===false && hintCount<200){" +
     "document.getElementById('b-hint').click(); hintCount++;} return hintCount;"
