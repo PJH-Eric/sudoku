@@ -755,7 +755,7 @@ async function main() {
     "boardLeft:desktopBoard.left,boardRight:desktopBoard.right,padLeft:desktopPad.left,padRight:desktopPad.right," +
     "gap:desktopPad.left-desktopBoard.right});"
   ));
-  check('桌機棋盤與輸入區不留大片空白', hostDesktopUi.viewportWidth === desktopWide.width && hostDesktopUi.gap <= 72,
+  check('桌機棋盤與輸入區不留大片空白', hostDesktopUi.viewportWidth === desktopWide.width && hostDesktopUi.gap <= 40,
     JSON.stringify(hostDesktopUi));
 
   await cdp.eval(

@@ -635,7 +635,7 @@ body{
   .optcard .t{font-size:.74rem}
   /* 桌機盤面依可用高度放大，容器收縮後不會在棋盤與輸入區之間留下大片空白 */
   .gamebody{padding:6px 24px 0;gap:22px;justify-content:center;width:100%;max-width:1120px;margin:0 auto}
-  .boardwrap{flex:0 1 auto}
+  .boardwrap{flex:0 0 auto;width:min(52vw,72dvh,720px)}
   .board{--bs:min(52vw,72dvh,720px)}
   .padwrap{width:300px;justify-content:center}
   .numkey{min-height:66px}
