@@ -185,6 +185,22 @@ function handleApi(req, res, urlPath, query) {
     return sendJson(req, res, 403, { ok: false, code: 'origin', message: '這個來源不在伺服器允許的名單裡（GAME_ALLOWED_ORIGIN）。' });
   }
 
+  /* --- 統一在線人數 --- */
+  if (urlPath === '/api/presence') {
+    if (req.method === 'OPTIONS') return preflight(req, res, 'GET, OPTIONS');
+    if (req.method !== 'GET') return sendJson(req, res, 405, { ok: false, message: '不支援的方法。' });
+    const connected = [...clients.values()].flatMap((set) => [...set]);
+    return sendJson(req, res, 200, {
+      gameId: 'sudoku',
+      online: connected.length,
+      players: connected.filter((client) => client.role === 'host').length,
+      spectators: connected.filter((client) => client.role === 'viewer').length,
+      lobby: 0,
+      rooms: [...clients.keys()].filter((code) => store.getRoom(code)).length,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
   /* --- 房間列表／開房 --- */
   if (urlPath === '/api/rooms') {
     if (req.method === 'OPTIONS') return preflight(req, res, 'GET, POST, OPTIONS');
