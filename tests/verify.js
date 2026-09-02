@@ -1153,6 +1153,7 @@ ok('線上相關畫面、狀態與設定都在 index.html 裡', () => {
     'watch-overlay', 'chat-panel', 'chat-log', 'chat-form', 'b-chat', 'chat-badge',
     'w-summary', 'watch-note-form', 'watch-note-input', 'watch-note-list', 'b-watch-note',
     'hostbar', 'host-codebox', 'h-code', 'b-copy-room-code', 'b-share', 'b-reinvite', 'b-close-room',
+    'b-room-info', 'room-info-modal', 'room-info-panel', 'room-info-body', 'room-info-close',
     'settings-nick', 'settings-chatcue']
     .forEach((id) => assert.ok(html.includes('id="' + id + '"'), '缺少線上模式的元素：' + id));
   assert.ok(html.includes('js/online.js'), 'index.html 要載入 online.js');
@@ -1166,6 +1167,9 @@ ok('線上相關畫面、狀態與設定都在 index.html 裡', () => {
   assert.ok(html.includes('複製主持人房號'), '主持人要能直接複製房號');
   assert.ok(html.includes('開房模式：出題後會自動開一間觀戰房'), '開始新題目要直接進入開房模式');
   assert.ok(!html.includes('id="b-open-room"'), '普通遊戲不需要額外的開放觀戰按鈕');
+  assert.ok(/class="stat stat-time"[\s\S]*id="b-pause"/.test(html), '暫停按鈕要放在計時器旁邊');
+  assert.ok(/id="b-room-info"[^>]*aria-haspopup="dialog"/.test(html), '房間資訊入口要標示成對話框按鈕');
+  assert.ok(/id="room-info-modal"[^>]*role="dialog"[\s\S]*id="hostbar"/.test(html), '房間資訊要用彈窗包住房主資訊列');
 });
 
 ok('觀戰者只能填格子留言與聊天：沒有數字盤、沒有遊戲提示', () => {
@@ -1231,6 +1235,16 @@ ok('設定彈窗的捲動結構正確：只有中間會捲，標題與按鈕列�
     '恢復預設要沿用專案的立體 SVG 按鈕');
   assert.ok(/class="btn3d small settings-done"/.test(html), '完成鈕要沿用專案的立體 SVG 按鈕');
   assert.ok(/w\.UI\.repaintAll\(q\('settings-panel'\)\)/.test(appSource), '彈窗打開後要補畫立體按鈕');
+});
+
+ok('房間資訊彈窗不佔用遊戲版面，且支援觸控與鍵盤關閉', () => {
+  assert.ok(/\.room-info-modal\{[^}]*position:fixed/.test(css), '房間資訊要固定在畫面上');
+  assert.ok(/\.room-info-modal\.open\{display:flex\}/.test(css), '房間資訊要有開啟狀態');
+  assert.ok(/\.room-info-panel\{[^}]*display:flex/.test(css), '房間資訊面板要用三段式 flex 佈局');
+  assert.ok(/\.room-info-body\{[^}]*overflow-y:auto/.test(css), '房間資訊內容過長時中間才可捲動');
+  assert.ok(/function setRoomInfoOpen/.test(appSource), '要有房間資訊彈窗的開關狀態');
+  assert.ok(/data-room-info-close/.test(html) && /e\.key === 'Escape'/.test(appSource), '要能點遮罩或按 Escape 關閉房間資訊');
+  assert.ok(/function bindRoomInfo/.test(appSource) && /room-info-panel'\)\.focus/.test(appSource), '房間資訊要綁定互動並把焦點移入面板');
 });
 
 /* ============================================================

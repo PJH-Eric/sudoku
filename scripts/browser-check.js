@@ -355,6 +355,14 @@ async function main() {
     screensToCheck.push(['遊戲中', info]);
     check('出題後停在遊戲畫面', info.activeScreen === 's-game', info.activeScreen);
     const boardInfo = JSON.parse(await cdp.eval('return JSON.stringify(window.__probe.board());'));
+    const gameControls = JSON.parse(await cdp.eval(
+      "var pause=document.getElementById('b-pause'); var roomInfo=document.getElementById('b-room-info');" +
+      "return JSON.stringify({pauseInTimer:!!pause.closest('.stat-time'),roomInfoHidden:roomInfo.hidden," +
+      "pauseWidth:pause.getBoundingClientRect().width,pauseHeight:pause.getBoundingClientRect().height});"
+    ));
+    check('暫停按鈕放在計時器旁邊且維持觸控尺寸', gameControls.pauseInTimer && gameControls.pauseWidth >= 40 && gameControls.pauseHeight >= 40,
+      JSON.stringify(gameControls));
+    check('單機遊戲不顯示房間資訊入口', gameControls.roomInfoHidden, JSON.stringify(gameControls));
     check('盤面有 81 格且是正方形', boardInfo.cells === 81 && Math.abs(boardInfo.width - boardInfo.height) <= 2,
       JSON.stringify(boardInfo));
     check('盤面完整在畫面內', boardInfo.left >= -1 && boardInfo.right <= info.vw + 1 && boardInfo.width >= 180,
@@ -489,16 +497,20 @@ async function main() {
 
   /* 筆記模式 */
   const noted = await cdp.eval(
-    "document.getElementById('b-note').click();" +
+    "var noteButton=document.getElementById('b-note'); var offColor=noteButton.getAttribute('data-color');" +
+    "noteButton.click();" +
     "var cells=document.querySelectorAll('#board .cell'); var idx=-1;" +
     "for(var i=0;i<81;i++){ if(!cells[i].classList.contains('given') && !cells[i].querySelector('.v').textContent){ idx=i; break; } }" +
     "cells[idx].click(); document.querySelector('.numkey[data-d=\"3\"]').click();" +
     "var notes=cells[idx].querySelectorAll('.nt i.on');" +
-    "var res={count:notes.length, pressed:document.getElementById('b-note').getAttribute('aria-pressed')};" +
-    "document.getElementById('b-note').click();" +
+    "var res={count:notes.length, pressed:noteButton.getAttribute('aria-pressed'),onColor:noteButton.getAttribute('data-color')," +
+    "offColor:offColor,onClass:noteButton.classList.contains('on'),tag:document.getElementById('note-tag').textContent};" +
+    "noteButton.click();" +
     "return JSON.stringify(res);"
   );
-  check('筆記模式只會記候選數', JSON.parse(noted).count === 1 && JSON.parse(noted).pressed === 'true', noted);
+  check('筆記模式只會記候選數且開啟顏色明顯', JSON.parse(noted).count === 1 && JSON.parse(noted).pressed === 'true' &&
+    JSON.parse(noted).onColor === 'grape' && JSON.parse(noted).offColor !== JSON.parse(noted).onColor &&
+    JSON.parse(noted).onClass && JSON.parse(noted).tag === '開', noted);
 
   /* 復原／重做 */
   const undone = await cdp.eval(
@@ -716,33 +728,52 @@ async function main() {
   const setupReady = await waitForPage("document.getElementById('s-setup').classList.contains('active')", 3000);
   await cdp.eval("document.getElementById('b-start').click(); return 1;");
   const hostReady = await waitForPage("document.getElementById('s-game').classList.contains('active') && !document.getElementById('hostbar').hidden && document.getElementById('h-code').textContent !== '開房中…'", 5000);
+  await cdp.eval("document.getElementById('b-room-info').click(); return 1;");
+  await sleep(220);
   const hostUi = JSON.parse(await cdp.eval(
+    "var roomModal=document.getElementById('room-info-modal'); var roomTrigger=document.getElementById('b-room-info');" +
     "var hostBar=document.getElementById('hostbar'); var hostBox=document.getElementById('host-codebox'); var hostCode=document.getElementById('h-code');" +
     "var rect=hostCode.getBoundingClientRect(); var boxRect=hostBox.getBoundingClientRect();" +
     "var copy=document.getElementById('b-copy-room-code'); var copyRect=copy.getBoundingClientRect();" +
     "var closeRoom=document.getElementById('b-close-room'); var closeRect=closeRoom.getBoundingClientRect();" +
-    "var boardRect=document.getElementById('board').getBoundingClientRect(); var hostBarRect=hostBar.getBoundingClientRect();" +
-    "return JSON.stringify({setup:" + String(setupReady) + ",game:" + String(hostReady) + "," +
+    "return JSON.stringify({setup:" + String(setupReady) + ",game:" + String(hostReady) + ",roomOpen:roomModal.classList.contains('open')," +
+    "roomFocus:document.activeElement.id,roomTriggerHidden:roomTrigger.hidden,hostParent:hostBar.parentNode.id," +
     "text:hostCode.textContent,display:getComputedStyle(hostCode).display,width:rect.width,height:rect.height," +
     "boxDisplay:getComputedStyle(hostBox).display,boxWidth:boxRect.width,boxHeight:boxRect.height," +
     "copyDisplay:getComputedStyle(copy).display,copyWidth:copyRect.width,copyHeight:copyRect.height," +
-    "hostBarBottom:hostBarRect.bottom,closeTop:closeRect.top,closeBottom:closeRect.bottom,boardTop:boardRect.top});"
+    "closeDisplay:getComputedStyle(closeRoom).display,closeWidth:closeRect.width,closeHeight:closeRect.height});"
   ));
-  check('開始新題目後會直接開房並看到清楚的房號', hostUi.setup && hostUi.game && /^[A-Z0-9]{4}$/.test(hostUi.text) &&
+  check('開始新題目後會直接開房並在房間資訊看到清楚的房號', hostUi.setup && hostUi.game && hostUi.roomOpen && hostUi.roomFocus === 'room-info-panel' &&
+    !hostUi.roomTriggerHidden && hostUi.hostParent === 'room-info-body' && /^[A-Z0-9]{4}$/.test(hostUi.text) &&
     hostUi.display !== 'none' && hostUi.width > 0 && hostUi.height > 0 && hostUi.boxDisplay !== 'none' &&
     hostUi.boxWidth > 0 && hostUi.boxHeight > 0 && hostUi.copyDisplay !== 'none' && hostUi.copyWidth > 0 && hostUi.copyHeight > 0 &&
-    hostUi.hostBarBottom <= hostUi.boardTop + 1 && hostUi.closeBottom <= hostUi.boardTop + 1, JSON.stringify(hostUi));
-  await shot('房主開房-667x375');
+    hostUi.closeDisplay !== 'none' && hostUi.closeWidth >= 40 && hostUi.closeHeight >= 40, JSON.stringify(hostUi));
+  await shot('房主房間資訊-667x375');
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await sleep(180);
+  const roomClosed = JSON.parse(await cdp.eval(
+    "var m=document.getElementById('room-info-modal'); return JSON.stringify({open:m.classList.contains('open'),focus:document.activeElement.id});"
+  ));
+  check('房間資訊按 Escape 關閉並把焦點還給入口', !roomClosed.open && roomClosed.focus === 'b-room-info', JSON.stringify(roomClosed));
   await setViewport(VIEWPORTS[1]);
+  await cdp.eval("document.getElementById('b-room-info').click(); return 1;");
+  await sleep(180);
   const hostMobileUi = JSON.parse(await cdp.eval(
+    "var mobileModal=document.getElementById('room-info-modal'); var mobileTrigger=document.getElementById('b-room-info');" +
     "var mobileBox=document.getElementById('host-codebox'); var mobileCode=document.getElementById('h-code');" +
     "var mobileRect=mobileCode.getBoundingClientRect(); var mobileBoxRect=mobileBox.getBoundingClientRect();" +
-    "return JSON.stringify({text:mobileCode.textContent,boxWidth:mobileBoxRect.width,boxHeight:mobileBoxRect.height," +
-    "codeWidth:mobileRect.width,codeHeight:mobileRect.height,viewportWidth:window.innerWidth});"
+    "var triggerRect=mobileTrigger.getBoundingClientRect();" +
+    "return JSON.stringify({open:mobileModal.classList.contains('open'),text:mobileCode.textContent,boxWidth:mobileBoxRect.width,boxHeight:mobileBoxRect.height," +
+    "codeWidth:mobileRect.width,codeHeight:mobileRect.height,triggerWidth:triggerRect.width,triggerHeight:triggerRect.height,viewportWidth:window.innerWidth});"
   ));
-  check('房主在 390×844 也看得到房號', /^[A-Z0-9]{4}$/.test(hostMobileUi.text) && hostMobileUi.viewportWidth === 390 &&
-    hostMobileUi.boxWidth > 0 && hostMobileUi.boxHeight > 0 && hostMobileUi.codeWidth > 0 && hostMobileUi.codeHeight > 0, JSON.stringify(hostMobileUi));
-  await shot('房主開房-390x844');
+  check('房主在 390×844 開啟房間資訊仍看得到房號', hostMobileUi.open && /^[A-Z0-9]{4}$/.test(hostMobileUi.text) && hostMobileUi.viewportWidth === 390 &&
+    hostMobileUi.triggerWidth >= 40 && hostMobileUi.triggerHeight >= 40 && hostMobileUi.boxWidth > 0 && hostMobileUi.boxHeight > 0 &&
+    hostMobileUi.codeWidth > 0 && hostMobileUi.codeHeight > 0, JSON.stringify(hostMobileUi));
+  await shot('房主房間資訊-390x844');
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await sleep(120);
 
   const desktopWide = { name: '桌機超寬短版', width: 1869, height: 815, mobile: false, dsf: 1 };
   await setViewport(desktopWide);

@@ -250,28 +250,22 @@
           <span class="chip ghost" id="g-seed">種子 —</span>
           <span class="chip ghost" id="g-tech">唯一候選數</span>
         </div>
-        <button class="btn3d small" data-color="lemon" id="b-pause" aria-label="暫停遊戲">⏸ 暫停</button>
       </header>
 
       <div class="statbar" id="statbar">
-        <div class="stat"><span class="k">時間</span><b id="st-time">00:00</b></div>
+        <div class="stat stat-time">
+          <span class="k">時間</span><b id="st-time">00:00</b>
+          <button class="btn3d stat-action stat-pause" data-color="lemon" id="b-pause" type="button" aria-label="暫停遊戲" title="暫停遊戲">
+            <span class="ico">⏸</span><span class="stat-action-label">暫停</span>
+          </button>
+          <button class="btn3d stat-action room-info-trigger" data-color="sky" id="b-room-info" type="button"
+                  hidden aria-label="開啟房間資訊" title="房間資訊" aria-haspopup="dialog" aria-controls="room-info-modal" aria-expanded="false">
+            <span class="ico">ⓘ</span><span class="stat-action-label">房間資訊</span>
+          </button>
+        </div>
         <div class="stat"><span class="k">剩餘</span><b id="st-left">0</b></div>
         <div class="stat"><span class="k">提示</span><b id="st-hint">0</b></div>
         <div class="stat"><span class="k">填錯</span><b id="st-miss">0</b></div>
-      </div>
-
-      <!-- 開房後才出現：醒目的房號、觀戰人數、連線狀態、分享連結、關房 -->
-      <div class="hostbar" id="hostbar" hidden>
-        <div class="host-codebox" id="host-codebox" aria-label="主持人房號">
-          <span class="host-code-label">本場房號</span>
-          <strong id="h-code">—</strong>
-          <button class="btn3d small host-code-copy" data-color="mint" id="b-copy-room-code" type="button" aria-label="複製主持人房號">複製房號</button>
-        </div>
-        <span class="chip ghost" id="h-viewers">👀 0 人觀戰</span>
-        <span class="chip ghost" id="h-conn" role="status" aria-live="polite">連線中…</span>
-        <button class="btn3d small" data-color="sky" id="b-share">🔗 分享連結</button>
-        <button class="btn3d small" data-color="cream" id="b-reinvite">↻ 換連結</button>
-        <button class="btn3d small" data-color="cream" id="b-close-room">關閉房間</button>
       </div>
     </div>
 
@@ -297,6 +291,34 @@
     <footer class="gfoot">
       <p class="feedback" id="feedback" role="status" aria-live="polite">點一個空格，再按下面的數字就能填入。</p>
     </footer>
+
+    <!-- 房主的房號、觀戰人數與連線操作集中在彈窗，避免佔用棋盤高度。 -->
+    <div class="room-info-modal" id="room-info-modal" role="dialog" aria-modal="true"
+         aria-labelledby="room-info-title" aria-hidden="true">
+      <div class="room-info-backdrop" data-room-info-close></div>
+      <section class="room-info-panel" id="room-info-panel" tabindex="-1">
+        <div class="room-info-head">
+          <span class="room-info-badge" aria-hidden="true">▣</span>
+          <h2 id="room-info-title">房間資訊</h2>
+          <button class="room-info-close" id="room-info-close" type="button" aria-label="關閉房間資訊">✕</button>
+        </div>
+        <div class="room-info-body" id="room-info-body">
+          <p class="room-info-note">房主可以在這裡複製房號、分享觀戰連結，或查看目前的房間連線狀態。</p>
+          <div class="hostbar" id="hostbar" hidden>
+            <div class="host-codebox" id="host-codebox" aria-label="主持人房號">
+              <span class="host-code-label">本場房號</span>
+              <strong id="h-code">—</strong>
+              <button class="btn3d small host-code-copy" data-color="mint" id="b-copy-room-code" type="button" aria-label="複製主持人房號">複製房號</button>
+            </div>
+            <span class="chip ghost" id="h-viewers">👀 0 人觀戰</span>
+            <span class="chip ghost" id="h-conn" role="status" aria-live="polite">連線中…</span>
+            <button class="btn3d small" data-color="sky" id="b-share">🔗 分享連結</button>
+            <button class="btn3d small" data-color="cream" id="b-reinvite">↻ 換連結</button>
+            <button class="btn3d small" data-color="cream" id="b-close-room">關閉房間</button>
+          </div>
+        </div>
+      </section>
+    </div>
 
     <div class="overlay" id="pause-overlay" aria-hidden="true">
       <div class="ovbox" role="dialog" aria-modal="true" aria-labelledby="pause-title" tabindex="-1" id="pause-box">

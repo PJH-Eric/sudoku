@@ -24,6 +24,8 @@
   var toastTimer = null;
   var settingsLastFocus = null;
   var settingsHistory = false;
+  var roomInfoLastFocus = null;
+  var roomInfoHistory = false;
   var pauseLastFocus = null;
   var cells = [];
   var padButtons = [];
@@ -482,7 +484,7 @@
     var b = q('b-note');
     b.setAttribute('aria-pressed', noteMode ? 'true' : 'false');
     b.classList.toggle('on', noteMode);
-    w.UI.setColor(b, noteMode ? 'mint' : 'sky');
+    w.UI.setColor(b, noteMode ? 'grape' : 'sky');
     q('note-tag').textContent = noteMode ? '開' : '關';
     say(noteMode ? '筆記模式已開啟：按數字只會在角落記候選數。' : '筆記模式已關閉：按數字會直接填入格子。', 'good');
     w.Sound.play('click');
@@ -588,6 +590,8 @@
     paused = false;
     q('pause-overlay').classList.remove('on');
     q('pause-overlay').setAttribute('aria-hidden', 'true');
+    q('b-room-info').hidden = !hostMode;
+    q('b-room-info').setAttribute('aria-expanded', 'false');
     toggleNoteMode(false);
     q('s-game').classList.toggle('hosting-room', hostMode);
     selected = firstEmpty();
@@ -929,6 +933,9 @@
       return;
     }
     q('s-game').classList.add('hosting-room');
+    q('b-room-info').hidden = false;
+    q('b-room-info').setAttribute('aria-expanded', 'false');
+    setTimeout(function () { w.UI.paint(q('b-room-info')); }, 0);
     q('hostbar').hidden = false;
     q('h-code').textContent = '開房中…';
     q('h-viewers').textContent = '👀 0 人觀戰';
@@ -947,6 +954,8 @@
         host = null;
         hostMode = false;
         q('s-game').classList.remove('hosting-room');
+        q('b-room-info').hidden = true;
+        q('b-room-info').setAttribute('aria-expanded', 'false');
         q('hostbar').hidden = true;
         setChatVisible(false);
         say('開房失敗：' + err.message, 'bad');
@@ -1003,9 +1012,12 @@
   function endHostRoom(announce) {
     if (!host) return;
     var code = host.code;
+    q('b-room-info').hidden = true;
+    setRoomInfoOpen(false);
     host = null;
     hostMode = false;
     q('s-game').classList.remove('hosting-room');
+    q('b-room-info').setAttribute('aria-expanded', 'false');
     q('hostbar').hidden = true;
     setChatVisible(false);
     setChatOpen(false);
@@ -1849,6 +1861,61 @@
   }
   function isSettingsOpen() { return q('settings-modal').classList.contains('open'); }
 
+  function setRoomInfoOpen(open, fromHistory) {
+    var modal = q('room-info-modal');
+    var trigger = q('b-room-info');
+    if (!modal) return;
+    if (open) {
+      if (!host || modal.classList.contains('open')) return;
+      roomInfoLastFocus = D.activeElement;
+      if (!roomInfoHistory && !fromHistory) {
+        try { history.pushState({ sdRoomInfo: true }, '', location.href); roomInfoHistory = true; } catch (e) {}
+      }
+    }
+    modal.classList.toggle('open', !!open);
+    modal.setAttribute('aria-hidden', open ? 'false' : 'true');
+    if (trigger) trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) {
+      w.UI.repaintAll(q('room-info-panel'));
+      q('room-info-panel').focus();
+    } else {
+      var back = (roomInfoLastFocus && roomInfoLastFocus !== D.body && !roomInfoLastFocus.hidden && typeof roomInfoLastFocus.focus === 'function')
+        ? roomInfoLastFocus : (trigger && !trigger.hidden ? trigger : q('b-quit'));
+      if (back && back.focus) back.focus();
+      roomInfoLastFocus = null;
+      if (roomInfoHistory && !fromHistory) {
+        roomInfoHistory = false;
+        try { history.back(); } catch (e) {}
+      }
+    }
+  }
+  function isRoomInfoOpen() { return q('room-info-modal').classList.contains('open'); }
+
+  function bindRoomInfo() {
+    q('b-room-info').addEventListener('click', function () { w.Sound.play('click'); setRoomInfoOpen(true); });
+    q('room-info-close').addEventListener('click', function () { w.Sound.play('click'); setRoomInfoOpen(false); });
+    qa('[data-room-info-close]').forEach(function (el) {
+      el.addEventListener('click', function () { setRoomInfoOpen(false); });
+    });
+
+    /* 房間資訊也是 Modal：Tab 不應跳到背後的遊戲控制。 */
+    q('room-info-modal').addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab') return;
+      var list = focusableIn(q('room-info-panel'));
+      if (!list.length) return;
+      var first = list[0], last = list[list.length - 1];
+      if (e.shiftKey && (D.activeElement === first || D.activeElement === q('room-info-panel'))) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && D.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    });
+
+    w.addEventListener('popstate', function () {
+      if (isRoomInfoOpen()) { roomInfoHistory = false; setRoomInfoOpen(false, true); }
+    });
+  }
+
   function bindSettings() {
     q('b-settings').addEventListener('click', function () { w.Sound.play('click'); setSettingsOpen(true); });
     q('settings-close').addEventListener('click', function () { w.Sound.play('click'); setSettingsOpen(false); });
@@ -2035,6 +2102,10 @@
         if (e.key === 'Escape') { e.preventDefault(); setSettingsOpen(false); }
         return;
       }
+      if (isRoomInfoOpen()) {
+        if (e.key === 'Escape') { e.preventDefault(); setRoomInfoOpen(false); }
+        return;
+      }
       /* 在留言板或任何文字欄位打字時，不可以把按鍵當成盤面操作 */
       var ae = D.activeElement;
       if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) {
@@ -2139,6 +2210,7 @@
     buildWatchBoard();
     bind();
     bindSettings();
+    bindRoomInfo();
     bindOnline();
     applyOptions();
     markDiff(pendingDifficulty);

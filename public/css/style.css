@@ -105,6 +105,46 @@ body{
 .settings-body::-webkit-scrollbar-thumb{background:var(--grape);border:2px solid var(--ink);border-radius:999px}
 .settings-body::-webkit-scrollbar-thumb:hover{background:var(--grape-d)}
 
+/* ---------- 房間資訊彈窗 ----------
+ * 房號與主持人操作集中在這裡，遊戲進行中只保留一個輕量入口，讓棋盤取得完整高度。 */
+.room-info-modal{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:18px}
+.room-info-modal.open{display:flex}
+.room-info-backdrop{position:absolute;inset:0;background:rgba(74,59,85,.36);backdrop-filter:blur(3px)}
+.room-info-panel{
+  position:relative;display:flex;flex-direction:column;
+  width:min(94vw,760px);max-height:min(88dvh,700px);overflow:hidden;
+  background:var(--paper);border:3px solid var(--ink);border-radius:26px;
+  box-shadow:0 12px 0 rgba(74,59,85,.2);outline:none;
+}
+.room-info-head{
+  flex:0 0 auto;display:flex;align-items:center;gap:10px;
+  padding:12px 14px 10px;background:linear-gradient(180deg,#F6EEFF 0%,var(--paper) 100%);
+  border-bottom:3px solid var(--line);border-radius:23px 23px 0 0;
+}
+.room-info-badge{
+  flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;
+  border:3px solid var(--ink);border-radius:50%;background:var(--sky);
+  box-shadow:0 3px 0 var(--sky-d);font-size:1.05rem;
+}
+.room-info-head h2{flex:1;margin:0;text-align:center;font-size:1.3rem;letter-spacing:.05em}
+.room-info-close{flex:0 0 auto;width:44px;height:44px;border:3px solid var(--ink);border-radius:50%;background:var(--rose);color:var(--ink);font:inherit;font-size:1.1rem;font-weight:900;cursor:pointer;box-shadow:0 4px 0 var(--rose-d)}
+.room-info-close:active{transform:translateY(3px);box-shadow:0 1px 0 var(--rose-d)}
+.room-info-body{
+  flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;
+  overscroll-behavior:contain;scrollbar-gutter:stable;
+  padding:12px 14px 16px;scrollbar-width:thin;scrollbar-color:var(--grape-d) transparent;
+  -webkit-overflow-scrolling:touch;
+}
+.room-info-body:focus-visible{outline:3px solid var(--sky-d);outline-offset:-3px;border-radius:12px}
+.room-info-body::-webkit-scrollbar{width:12px}
+.room-info-body::-webkit-scrollbar-track{background:transparent;margin:6px 0}
+.room-info-body::-webkit-scrollbar-thumb{background:var(--grape);border:2px solid var(--ink);border-radius:999px}
+.room-info-note{margin:0 0 12px;padding:10px 12px;background:#F6F0FF;border:2px solid var(--line);border-radius:14px;color:var(--ink-soft);font-size:.82rem;font-weight:700;line-height:1.55;text-align:center}
+.room-info-body .hostbar{padding:0;justify-content:flex-start;align-items:stretch;gap:9px}
+.room-info-body .host-codebox{flex:1 1 100%;justify-content:center}
+.room-info-body .hostbar > .chip{display:inline-flex;align-items:center}
+.room-info-body .hostbar > .btn3d{flex:1 1 150px}
+
 /* 捲動陰影：純 CSS 的 background-attachment 技巧，只有真的可以捲時才會出現，
  * 不需要 JS，也不會在減少動態模式下動來動去。 */
 .settings-body{
@@ -246,8 +286,12 @@ body{
 
 .statbar{display:flex;gap:8px;justify-content:center;padding:8px 12px 4px;flex-wrap:wrap}
 .stat{display:flex;align-items:baseline;gap:6px;background:#fff;border:3px solid var(--ink);border-radius:16px;padding:4px 12px;box-shadow:0 4px 0 rgba(74,59,85,.13)}
+.stat-time{align-items:center}
 .stat .k{font-size:.72rem;color:var(--ink-soft);font-weight:800}
 .stat b{font-size:1.05rem;font-weight:900;font-variant-numeric:tabular-nums}
+.stat-action{flex:0 0 auto;min-width:44px;min-height:44px;padding:6px 9px calc(6px + var(--d));font-size:.72rem;--d:5px}
+.stat-action .b3-lbl{gap:.25em}
+.stat-action .ico{font-size:1em}
 
 .gamebody{display:flex;flex:1;min-height:0;gap:10px;padding:4px 10px 0;flex-direction:column}
 .boardwrap{flex:1 1 auto;display:flex;align-items:center;justify-content:center;min-height:0;min-width:0}
@@ -318,6 +362,8 @@ body{
 .tools .btn3d .b3-lbl{flex-direction:column;gap:1px}
 .tools .ico{font-size:1.15rem;line-height:1}
 .tools .tag{font-size:.66rem;color:var(--ink-soft);font-weight:800}
+.tools .tool.on{outline:3px solid var(--grape-t);outline-offset:2px;filter:saturate(1.25)}
+.tools .tool.on .tag{padding:1px 5px;color:var(--ink);background:var(--lemon);border:2px solid var(--ink);border-radius:999px}
 .numpad{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
 .numkey{--d:7px;min-height:58px;padding:8px 4px calc(8px + var(--d))}
 .numkey .b3-lbl{flex-direction:column;gap:0}
@@ -605,13 +651,6 @@ body{
   .numkey .nk{font-size:1.25rem}
   .tools .btn3d{min-height:44px;font-size:.74rem}
   .btn3d.small{min-height:42px}
-  /* 主持房間資訊不能和標題／統計擠在同一排，否則盤面會蓋到第二排按鈕 */
-  #s-game.hosting-room .gtop{display:block;padding:4px 66px 0 8px}
-  #s-game.hosting-room .gbar{display:flex;padding:0;gap:6px}
-  #s-game.hosting-room .statbar{display:flex;min-width:0;padding:0;gap:6px;justify-content:flex-end;flex-wrap:nowrap;overflow:hidden}
-  #s-game.hosting-room .hostbar{width:100%;box-sizing:border-box;padding:2px 0 3px}
-  #s-game.hosting-room.active{overflow-y:auto}
-  #s-game.hosting-room .gamebody{flex:0 0 280px;min-height:280px}
   /* 五張難度卡在矮橫向壓成一行式，維持 44px 以上命中區 */
   .diff-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .optcard{min-height:52px;padding:8px 10px;flex-direction:row;align-items:center;flex-wrap:wrap;gap:2px 8px}
@@ -675,6 +714,13 @@ body{
   .settings-group{padding:6px 7px 4px;border-radius:17px}
   .settings-foot{padding:8px 10px calc(8px + env(safe-area-inset-bottom))}
   .settings-head h2{font-size:1.2rem}
+  .room-info-modal{padding:10px}
+  .room-info-panel{width:100%;max-height:92dvh;border-radius:22px}
+  .room-info-head{padding:9px 10px 8px}
+  .room-info-badge{width:34px;height:34px}
+  .room-info-head h2{font-size:1.16rem}
+  .room-info-body{padding:8px 8px 12px}
+  .room-info-note{font-size:.76rem;padding:8px 10px}
   .setting-toggle,.setting-range,.setting-text,.setting-static{padding-left:4px;padding-right:4px;gap:8px}
   .setting-range input[type=range]{width:44%}
   .panel{width:calc(100% - 20px);margin:12px auto 20px;padding:14px 13px 20px;border-radius:22px}
@@ -695,6 +741,9 @@ body{
   #g-tech{display:none}
   .statbar{gap:6px;padding:6px 8px 2px}
   .stat{padding:3px 9px;border-width:2px}
+  .stat-time{gap:4px;padding-left:6px;padding-right:6px}
+  .stat-action{min-width:44px;min-height:44px;padding:5px 7px calc(5px + var(--d));font-size:.68rem}
+  .stat-action-label{display:none}
   .stat .k{font-size:.66rem}
   .stat b{font-size:.95rem}
   .gamebody{padding:4px 7px 0;gap:8px}
@@ -734,13 +783,14 @@ body{
 
 /* 矮橫向手機：控制列再壓低，讓棋盤和完整數字盤同時留在視線內 */
 @media (orientation:landscape) and (max-height:520px){
-  #s-game .gtop{padding-top:1px}
-  #s-game .gbar{padding:2px 62px 0 6px;gap:4px}
+  #s-game .gtop{padding-top:0}
+  #s-game .gbar{padding:0 62px 0 6px;gap:4px}
   #s-game .gbar .btn3d{min-height:44px;font-size:.68rem;padding:4px 8px calc(4px + var(--d));--d:4px}
   #s-game .gmeta{gap:3px}
   #s-game .chip{font-size:.64rem;padding:1px 7px}
-  #s-game .statbar{gap:4px;padding:2px 6px 1px}
+  #s-game .statbar{gap:4px;padding:1px 6px 0}
   #s-game .stat{padding:1px 6px;border-width:2px}
+  #s-game .stat-time{height:44px;padding-top:0;padding-bottom:0}
   #s-game .stat .k{font-size:.6rem}
   #s-game .stat b{font-size:.84rem}
   #s-game .gamebody{padding:0 6px;gap:6px}
@@ -859,6 +909,14 @@ body{
   .settings-badge{width:32px;height:32px}
   .settings-head h2{font-size:1.06rem}
   .settings-close{width:40px;height:40px}
+  .room-info-modal{padding:6px}
+  .room-info-panel{max-height:96dvh;width:min(96vw,620px)}
+  .room-info-head{padding:6px 9px}
+  .room-info-badge{width:32px;height:32px}
+  .room-info-head h2{font-size:1.06rem}
+  .room-info-close{width:40px;height:40px}
+  .room-info-body{padding:6px 7px 9px}
+  .room-info-note{margin-bottom:8px;padding:6px 8px;font-size:.7rem}
   .settings-body{padding:6px 7px 8px}
   .settings-group{padding:5px 7px 3px;margin-bottom:8px}
   .settings-group h3{margin-bottom:4px;font-size:.92rem}
