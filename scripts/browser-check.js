@@ -173,7 +173,10 @@ const PAGE_HELPERS = `
         cell: Math.round(cell.width * 10) / 10,
         room: Math.round(room),
         usage: Math.round((r.width / room) * 100),
-        filled: b.querySelectorAll('.cell.given').length
+        filled: b.querySelectorAll('.cell.given').length,
+        toolMax: Math.max.apply(null, Array.prototype.map.call(document.querySelectorAll('#s-game .tools .btn3d'), function (el) { return el.getBoundingClientRect().height; })),
+        numMax: Math.max.apply(null, Array.prototype.map.call(document.querySelectorAll('#s-game .numkey'), function (el) { return el.getBoundingClientRect().height; })),
+        noteCorner: Math.max.apply(null, Array.prototype.map.call(b.querySelectorAll('.cell-note-corner'), function (el) { return Math.max(el.getBoundingClientRect().width, el.getBoundingClientRect().height); }))
       };
     },
     click: function (sel) {
@@ -360,6 +363,17 @@ async function main() {
     /* 9×9 固定格線的單格必然比一般按鈕小；30px 是常見數獨 App 的下限，仍然好點。
      * 極矮的橫向手機（例如 667×375）會落在 31~32px，直向會回到 35px 以上。 */
     check('每一格至少 30px 好點得到', boardInfo.cell >= 30, '格子 ' + boardInfo.cell + 'px（盤面 ' + boardInfo.width + 'px）');
+    const boardMinimum = v.width === 360 ? 325 : v.width === 390 ? 365 : v.height <= 520 ? 300 : v.width === 768 ? 680 : 600;
+    check('手機／平板棋盤優先使用可用空間', boardInfo.width >= boardMinimum,
+      v.width + '×' + v.height + ' 只有 ' + boardInfo.width + 'px（至少 ' + boardMinimum + 'px）');
+    if (v.width <= 820) {
+      check('手機／平板工具按鈕維持緊湊但不超過 54px', boardInfo.toolMax <= 54,
+        '工具按鈕最高 ' + boardInfo.toolMax + 'px');
+      check('手機／平板數字鍵維持緊湊但不超過 54px', boardInfo.numMax <= 54,
+        '數字鍵最高 ' + boardInfo.numMax + 'px');
+    }
+    check('格子留言三角形縮小避免誤按', boardInfo.noteCorner <= 12,
+      '三角形 ' + boardInfo.noteCorner + 'px');
     const noteChrome = JSON.parse(await cdp.eval(
       "var corner=document.querySelector('#board .cell .cell-note-corner');" +
       "if(corner) corner.click();" +
