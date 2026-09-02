@@ -464,7 +464,7 @@ body{
 #s-watch.active{display:flex;flex-direction:column;overflow:hidden}
 #s-watch .gbar .spacer{width:56px;flex:0 0 auto}
 
-/* 操作 Summary：寬版在右半邊常駐，窄版收合 */
+/* 操作 Summary：與聊天室同在左側，窄版收合；主要盤面取得剩餘空間 */
 .summary{
   flex:0 0 auto;background:var(--paper);border:3px solid var(--ink);border-radius:20px;
   box-shadow:0 6px 0 rgba(74,59,85,.14);padding:10px 12px;overflow-y:auto;min-height:0;
@@ -788,34 +788,43 @@ body{
 /* ============================================================
  * 線上觀戰相關畫面的 RWD
  * 版面策略：
- *   - 窄版（直向手機）：盤面在上、Summary 收合在下、留言板是左下浮動入口＋底部面板。
- *   - 平板橫向與桌機：盤面在左、Summary 常駐右半邊；留言板維持左下錨點的浮動面板。
+ *   - 窄版（直向手機）：Summary 靠左收合在盤面上方，盤面使用其餘高度；留言板是左下浮動入口＋底部面板。
+ *   - 平板橫向與桌機：左側資訊欄由 Summary 在上、聊天室在下，盤面吃滿剩餘寬度。
  *   - 右上角設定按鈕與彈窗永遠在最上層（z-index 70／100），留言板是 58–65，不會蓋住它。
  * ========================================================== */
 
-/* 預設（含直向）：Summary 排在盤面下方，寬度撐滿 */
+/* 預設（含直向）：Summary 靠左置於盤面上方，收合後只留下精簡標題列 */
 .watchbody{flex-direction:column}
-.watchbody .summary{width:100%;max-height:34dvh}
+.watchbody .summary{order:-1;align-self:flex-start;width:min(100%,360px);max-height:34dvh}
+.watchbody .boardwrap{order:1;min-width:0}
 
-/* 橫向：盤面在左、Summary 在右半邊 */
+/* 橫向：Summary 在左側資訊欄，盤面取得所有剩餘空間 */
 @media (orientation:landscape){
-  .watchbody{flex-direction:row;align-items:stretch}
-  .watchbody .summary{width:clamp(230px,32vw,340px);max-height:none}
+  #s-watch{--watch-rail-w:clamp(220px,24vw,300px)}
+  .watchbody{flex-direction:row;align-items:stretch;justify-content:stretch;width:100%;max-width:none;margin:0;padding:6px 14px 0;gap:18px}
+  .watchbody .summary{width:var(--watch-rail-w);flex:0 0 var(--watch-rail-w);max-height:none}
+  .watchbody .boardwrap{flex:1 1 auto;min-width:0}
+  .watchbody .board{--bs:min(90vw,64dvh)}
+  #s-watch.active ~ .chat-fab{left:calc(clamp(220px,24vw,300px) + 14px + env(safe-area-inset-left))}
+  #s-watch.active ~ .chat-panel{left:calc(clamp(220px,24vw,300px) + 14px + env(safe-area-inset-left))}
 }
 
-/* 桌機寬版：Summary 再寬一點，內容更好讀 */
+/* 桌機寬版：左側資訊欄固定寬度，盤面不再被 max-width 容器限制 */
 @media (min-width:1100px){
-  .watchbody{padding:6px 24px 0;gap:22px;justify-content:center;width:100%;max-width:1180px;margin:0 auto}
-  .watchbody .summary{width:330px;padding:14px 16px}
+  #s-watch{--watch-rail-w:300px}
+  .watchbody{padding:6px 18px 0;gap:18px;justify-content:stretch;width:100%;max-width:none;margin:0}
+  .watchbody .summary{width:var(--watch-rail-w);flex-basis:var(--watch-rail-w);padding:14px 16px}
   .sum-row{font-size:.9rem;padding:7px 2px}
   .chat-panel{width:360px;max-height:min(66dvh,600px)}
+  #s-watch.active ~ .chat-fab{left:calc(300px + 18px + env(safe-area-inset-left))}
+  #s-watch.active ~ .chat-panel{left:calc(300px + 18px + env(safe-area-inset-left))}
   .roomlist{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 
 /* 平板直向：Summary 給多一點高度，房間列表兩欄 */
 @media (orientation:portrait) and (min-width:700px){
   .watchbody{padding:6px 28px 0}
-  .watchbody .summary{max-height:40dvh}
+  .watchbody .summary{max-height:40dvh;width:min(100%,380px)}
   .roomlist{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 
@@ -827,7 +836,7 @@ body{
     width:auto;max-height:min(72dvh,540px);border-radius:20px;
   }
   .chat-log{min-height:70px}
-  .watchbody .summary{max-height:32dvh;padding:8px 10px}
+  .watchbody .summary{max-height:32dvh;width:min(100%,360px);padding:8px 10px}
   .lobby-me{gap:10px}
   .lobby-me .btn3d{width:100%}
   .lobby-join .btn3d{flex:1 1 auto}

@@ -1188,7 +1188,7 @@ ok('觀戰者只能填格子留言與聊天：沒有數字盤、沒有遊戲提�
     '觀戰盤面的格子要用 div，不可以做成可點的按鈕');
 });
 
-ok('聊天室錨定左下角，操作 Summary 在寬版右半邊，都不會蓋住右上角設定', () => {
+ok('聊天室與操作 Summary 同在左側，且不會蓋住右上角設定', () => {
   assert.ok(/\.chat-fab\{[^}]*position:fixed/.test(css), '留言入口要固定在畫面上');
   assert.ok(/\.chat-fab\{[^}]*left:/.test(css) && /\.chat-fab\{[^}]*bottom:/.test(css), '留言入口要在左下角');
   assert.ok(/\.chat-panel\{[^}]*left:/.test(css), '留言面板要錨定左邊');
@@ -1207,6 +1207,8 @@ ok('聊天室錨定左下角，操作 Summary 在寬版右半邊，都不會蓋�
   assert.ok(modalZ > fabZ, '設定彈窗要在最上層');
   assert.ok(/\.summary\{/.test(css), '缺少操作 Summary 的樣式');
   assert.ok(/\.summary\.collapsed \.sum-body\{display:none\}/.test(css), 'Summary 要可以收合');
+  assert.ok(/\.watchbody \.summary\{order:-1/.test(css), 'Summary 要排在左側資訊欄的前方');
+  assert.ok(/#s-watch\.active ~ \.chat-panel\{left:/.test(css), '觀戰聊天室要跟著左側資訊欄定位');
 });
 
 ok('設定彈窗的捲動結構正確：只有中間會捲，標題與按鈕列固定', () => {
