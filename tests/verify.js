@@ -589,6 +589,14 @@ ok('每個必要畫面都存在', () => {
   assert.ok(html.includes('id="feedback"') && html.includes('aria-live="polite"'), '缺少可被朗讀的行動回饋區');
 });
 
+ok('返回遊戲大廳按鈕固定在左上安全區', () => {
+  const match = /\.lobby-home-link\{([^}]*)\}/.exec(css);
+  assert.ok(match, '缺少返回遊戲大廳按鈕樣式');
+  assert.match(match[1], /position:fixed/);
+  assert.match(match[1], /top:[^;]*env\(safe-area-inset-top\)/, '返回按鈕的上方定位必須處理安全區');
+  assert.match(match[1], /left:[^;]*env\(safe-area-inset-left\)/, '返回按鈕的左側定位必須處理安全區');
+});
+
 ok('右上角設定按鈕會開 Modal 彈窗', () => {
   assert.ok(html.includes('id="b-settings"'), '缺少設定按鈕');
   assert.ok(html.includes('aria-haspopup="dialog"') && html.includes('aria-controls="settings-modal"'),
