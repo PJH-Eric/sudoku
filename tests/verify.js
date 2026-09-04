@@ -1161,6 +1161,7 @@ ok('前端：連線層集中在 online.js，聊天一律用 textContent 顯示',
 
 ok('線上相關畫面、狀態與設定都在 index.html 裡', () => {
   ['s-lobby', 's-watch', 'lobby-off', 'lobby-state', 'roomlist', 'watch-board',
+    'lobby-invite', 'b-lobby-invite',
     'watch-overlay', 'chat-panel', 'chat-log', 'chat-form', 'b-chat', 'chat-badge',
     'w-summary', 'watch-note-form', 'watch-note-input', 'watch-note-list', 'b-watch-note',
     'hostbar', 'host-codebox', 'h-code', 'b-copy-room-code', 'b-share', 'b-reinvite', 'b-close-room',
@@ -1181,6 +1182,8 @@ ok('線上相關畫面、狀態與設定都在 index.html 裡', () => {
   assert.ok(/class="stat stat-time"[\s\S]*id="b-pause"/.test(html), '暫停按鈕要放在計時器旁邊');
   assert.ok(/id="b-room-info"[^>]*aria-haspopup="dialog"/.test(html), '房間資訊入口要標示成對話框按鈕');
   assert.ok(/id="room-info-modal"[^>]*role="dialog"[\s\S]*id="hostbar"/.test(html), '房間資訊要用彈窗包住房主資訊列');
+  assert.ok(appSource.includes('pendingInvite') && appSource.includes('joinPendingInvite') && appSource.includes("q('lobby-invite').hidden = true"),
+    '數獨邀請連結必須先讓觀戰者確認暱稱');
 });
 
 ok('觀戰者只能填格子留言與聊天：沒有數字盤、沒有遊戲提示', () => {

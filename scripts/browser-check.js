@@ -811,6 +811,9 @@ async function main() {
   await setViewport(VIEWPORTS[1]);
   await goto(BASE + '?server=' + encodeURIComponent('http://127.0.0.1:' + PORT) +
     '&room=' + encodeURIComponent(onlineRoom.code) + '&invite=' + encodeURIComponent(onlineRoom.inviteToken));
+  const inviteLobby = await waitForPage("document.getElementById('s-lobby').classList.contains('active') && !document.getElementById('lobby-invite').hidden", 5000);
+  check('邀請連結先停在大廳讓觀戰者設定暱稱', inviteLobby);
+  await cdp.eval("document.getElementById('lobby-nick').value='數獨觀眾'; document.getElementById('lobby-nick').dispatchEvent(new Event('input')); document.getElementById('b-lobby-invite').click(); return 1;");
   const watchReady = await waitForPage("document.getElementById('s-watch').classList.contains('active') && document.querySelectorAll('#watch-board .cell').length === 81", 5000);
   await waitForPage("document.getElementById('sum-conn').getAttribute('data-state') === 'open'", 5000);
   const watchUi = JSON.parse(await cdp.eval(

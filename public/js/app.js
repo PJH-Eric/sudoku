@@ -721,6 +721,7 @@
 
   var host = null;         // 開房中：{ code, token, invite, viewers }
   var watch = null;        // 觀戰中：{ code, invite, view, meta, viewers, cellNotes, selected }
+  var pendingInvite = null; // 邀請連結：先讓來賓確認暱稱，再建立觀戰連線
   var hostMode = false;    // 難度選擇畫面是否為「開房模式」
   var nick = w.Store.loadNick();
   var watchCells = [];
@@ -1360,6 +1361,22 @@
     });
   }
 
+  function joinPendingInvite() {
+    if (!pendingInvite) return;
+    var value = w.Store.normalizeNick(q('lobby-nick').value);
+    if (!value) {
+      toast('請先輸入暱稱，再加入邀請房間');
+      q('lobby-nick').focus();
+      return;
+    }
+    nick = value;
+    w.Store.saveNick(nick);
+    var invite = pendingInvite;
+    pendingInvite = null;
+    q('lobby-invite').hidden = true;
+    joinRoom(invite.code, invite.token);
+  }
+
   function onWatchStatus(st, detail) {
     setChatConn(st, detail);
     q('sum-conn').textContent = CONN_TEXT[st] || st;
@@ -1689,12 +1706,21 @@
     var invite = '';
     var mi = /[?&]invite=([^&]*)/.exec(w.location.search);
     if (mi) { try { invite = decodeURIComponent(mi[1]); } catch (e) { invite = mi[1]; } }
+    pendingInvite = { code: String(m[1] || '').toUpperCase(), token: invite };
+    q('lobby-code').value = pendingInvite.code;
+    q('lobby-invite').hidden = false;
+    q('lobby-invite-note').textContent = invite
+      ? '請先設定你的暱稱，再加入這間受邀的觀戰房間。'
+      : '請先設定你的暱稱，再加入這間觀戰房間。';
     if (!w.Online.isEnabled()) {
       go('s-lobby');
       renderLobby();
       return true;
     }
-    joinRoom(m[1], invite);
+    go('s-lobby');
+    renderLobby();
+    setLobbyState('ok', '邀請連結已準備好，確認暱稱後就能加入。');
+    try { q('lobby-nick').focus(); } catch (e) {}
     return true;
   }
 
@@ -1716,7 +1742,16 @@
     });
     q('b-lobby-join').addEventListener('click', function () {
       w.Sound.play('click');
-      joinRoom(q('lobby-code').value, '');
+      var code = q('lobby-code').value;
+      if (pendingInvite && pendingInvite.code === String(code || '').toUpperCase()) {
+        joinPendingInvite();
+        return;
+      }
+      joinRoom(code, '');
+    });
+    q('b-lobby-invite').addEventListener('click', function () {
+      w.Sound.play('click');
+      joinPendingInvite();
     });
     q('lobby-code').addEventListener('input', function (e) {
       e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
