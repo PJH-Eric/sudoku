@@ -31,6 +31,7 @@
   var stateTimer = null;
   var lastStateAt = 0;
   var pushing = false;
+  var latencyProbeInFlight = false;
 
   function isEnabled() { return !!(C && C.isOnlineEnabled()); }
 
@@ -135,6 +136,7 @@
     if (!session) return;
     if (session.state === next && next !== 'failed') return;
     session.state = next;
+    if (next !== 'open' && w.NetworkLatency) w.NetworkLatency.report(null);
     if (handlers.status) handlers.status(next, detail || '');
   }
   function connState() { return session ? session.state : 'idle'; }
@@ -173,6 +175,18 @@
       state: 'idle',
       limits: null
     };
+    if (w.NetworkLatency) w.NetworkLatency.setProbe(function () {
+      var current = session;
+      if (latencyProbeInFlight) return;
+      if (!current || current.state !== 'open') { w.NetworkLatency.report(null); return; }
+      latencyProbeInFlight = true;
+      var started = performance.now();
+      request('GET', '/api/presence', null, function (err) {
+        if (session !== current) return;
+        latencyProbeInFlight = false;
+        w.NetworkLatency.report(err ? null : performance.now() - started);
+      });
+    });
     openStream();
     return true;
   }
@@ -282,6 +296,8 @@
 
   function disconnect() {
     stopStatePush();
+    latencyProbeInFlight = false;
+    if (w.NetworkLatency) { w.NetworkLatency.setProbe(null); w.NetworkLatency.report(null); }
     if (session && session.es) {
       try { session.es.close(); } catch (e) {}
     }

@@ -130,6 +130,7 @@
     if (cur === 's-lobby' && id !== 's-lobby') stopLobbyAuto();
     qa('.screen').forEach(function (s) { s.classList.toggle('active', s.id === id); });
     cur = id;
+    if (w.NetworkLatency) w.NetworkLatency.setActive((id === 's-game' && hostMode && state && state.status === 'playing') || (id === 's-watch' && !!(watch && watch.view && watch.view.status === 'playing')));
     w.Sound.setTrack((id === 's-game' || id === 's-watch') ? 'game' : 'menu');
     if (id === 's-game') {
       setTimeout(resizeBoard, 40);
@@ -967,6 +968,7 @@
         code: data.code, token: data.hostToken, invite: data.inviteToken, viewers: 0,
         cellNotes: normalizeCellNotes()
       };
+      if (w.NetworkLatency) w.NetworkLatency.setActive(cur === 's-game' && !!state && state.status === 'playing');
       q('h-code').textContent = host.code;
       resetChat('房號 ' + host.code + '（你是主持人）');
       setChatVisible(true);
@@ -1012,6 +1014,7 @@
   /* 結束開房。announce=true 代表主動通知伺服器關房。 */
   function endHostRoom(announce) {
     if (!host) return;
+    if (w.NetworkLatency) w.NetworkLatency.setActive(false);
     var code = host.code;
     q('b-room-info').hidden = true;
     setRoomInfoOpen(false);
@@ -1398,6 +1401,7 @@
     if (!watch) return;
     var view = G.spectatorView(data.board);
     if (!view) return;
+    if (w.NetworkLatency) w.NetworkLatency.setActive(cur === 's-watch' && view.status === 'playing');
     var prev = lastWatchValues;
     watch.meta = data;
     watch.view = view;
@@ -1531,6 +1535,7 @@
 
   function leaveWatch(goLobby) {
     if (watch) {
+      if (w.NetworkLatency) w.NetworkLatency.setActive(false);
       w.Online.disconnect();
       watch = null;
     }
