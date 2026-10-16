@@ -536,6 +536,7 @@
   }
 
   function beginGame(isNew) {
+    if (isNew) GameAnalytics.start({ mode: 'solo', difficulty: state.difficulty, players: 1 });
     paused = false;
     q('pause-overlay').classList.remove('on');
     q('pause-overlay').setAttribute('aria-hidden', 'true');
@@ -599,6 +600,7 @@
 
   /* ---------- 結算 ---------- */
   function finishGame() {
+    GameAnalytics.end({ result: 'win' });
     stopTimer();
     w.Store.clearGame();
     w.Sound.play('win');
@@ -932,6 +934,7 @@
         toast(tr('toast.openFail'));
         return;
       }
+      GameAnalytics.track('room_create', { mode: 'online' });
       host = {
         code: data.code, token: data.hostToken, invite: data.inviteToken, viewers: 0,
         cellNotes: normalizeCellNotes()
@@ -1305,6 +1308,7 @@
       invite: invite,
       on: {
         status: onWatchStatus,
+        welcome: function () { GameAnalytics.roomAccepted('join', code, invite ? 'invite_link' : 'lobby'); },
         state: onWatchState,
         note: onSharedNote,
         chat: onChatMessage,
@@ -1533,6 +1537,7 @@
 
   function leaveWatch(goLobby) {
     if (watch) {
+      GameAnalytics.roomLeft();
       if (w.NetworkLatency) w.NetworkLatency.setActive(false);
       w.Online.disconnect();
       watch = null;
