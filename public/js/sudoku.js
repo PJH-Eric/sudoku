@@ -94,11 +94,25 @@
   function cellName(index) {
     return 'R' + (ROW_OF[index] + 1) + 'C' + (COL_OF[index] + 1);
   }
+  /* 多語系：字典在 locales.js；沒有載入 I18N 時（極簡環境）退回 key，不會丟例外 */
+  function T(key, params) {
+    return (w.I18N && w.I18N.t) ? w.I18N.t(key, params) : key;
+  }
   function unitName(unitIndex) {
     var no = UNIT_NO[unitIndex] + 1;
-    if (UNIT_KIND[unitIndex] === 'row') return '第 ' + no + ' 列';
-    if (UNIT_KIND[unitIndex] === 'col') return '第 ' + no + ' 行';
-    return '第 ' + no + ' 宮';
+    if (UNIT_KIND[unitIndex] === 'row') return T('unit.row', { n: no });
+    if (UNIT_KIND[unitIndex] === 'col') return T('unit.col', { n: no });
+    return T('unit.box', { n: no });
+  }
+  /* 技巧名稱在資料裡維持中文識別字（存檔、房間資訊都用它），顯示時才翻譯 */
+  var TECH_KEYS = {
+    '唯一候選數': 'tech.single', '隱藏唯一數': 'tech.hidden', '區塊摒除': 'tech.locked',
+    '裸對': 'tech.nakedPair', '裸三': 'tech.nakedTriple', '隱藏對': 'tech.hiddenPair',
+    'X-Wing': 'tech.xwing', '這裡邏輯推不下去': 'tech.stuck',
+    '區塊摒除／裸對': 'tier.3', '裸三、隱藏對與 X-Wing': 'tier.4', '需要試誤推理': 'tier.5'
+  };
+  function techLabel(name) {
+    return TECH_KEYS[name] ? T(TECH_KEYS[name]) : (name || '');
   }
 
   /* 某格填入某數字是否不違反規則（不看該格自己原本的值） */
@@ -344,7 +358,7 @@
       var d = LOWEST[st.cand[i]];
       return {
         tier: TIER.SINGLE, technique: '唯一候選數', index: i, digit: d, placed: true,
-        reason: cellName(i) + ' 的同列、同行、同宮已經用掉其他 8 個數字，所以只能填 ' + d + '。'
+        reason: T('hint.single', { cell: cellName(i), d: d })
       };
     }
     return null;
@@ -365,7 +379,7 @@
         if (used || n !== 1) continue;
         return {
           tier: TIER.HIDDEN, technique: '隱藏唯一數', index: spot, digit: d, placed: true,
-          reason: unitName(u) + '裡面只有 ' + cellName(spot) + ' 放得下 ' + d + '，所以這格填 ' + d + '。'
+          reason: T('hint.hidden', { unit: unitName(u), cell: cellName(spot), d: d })
         };
       }
     }
@@ -392,8 +406,8 @@
           if (COL_OF[spots[k]] !== COL_OF[spots[0]]) sameCol = false;
         }
         var line = null, lineLabel = '';
-        if (sameRow) { line = UNITS[ROW_OF[spots[0]]]; lineLabel = '第 ' + (ROW_OF[spots[0]] + 1) + ' 列'; }
-        else if (sameCol) { line = UNITS[9 + COL_OF[spots[0]]]; lineLabel = '第 ' + (COL_OF[spots[0]] + 1) + ' 行'; }
+        if (sameRow) { line = UNITS[ROW_OF[spots[0]]]; lineLabel = T('unit.row', { n: ROW_OF[spots[0]] + 1 }); }
+        else if (sameCol) { line = UNITS[9 + COL_OF[spots[0]]]; lineLabel = T('unit.col', { n: COL_OF[spots[0]] + 1 }); }
         if (!line) continue;
         removed = 0;
         for (k = 0; k < line.length; k++) {
@@ -404,7 +418,7 @@
         if (removed) {
           return {
             tier: TIER.LOCKED, technique: '區塊摒除', placed: false, eliminated: removed, digit: d,
-            reason: unitName(u) + '的 ' + d + ' 只能落在' + lineLabel + '，所以' + lineLabel + '其他宮的格子可以刪掉 ' + d + '。'
+            reason: T('hint.pointing', { unit: unitName(u), d: d, line: lineLabel })
           };
         }
       }
@@ -433,7 +447,7 @@
         if (removed) {
           return {
             tier: TIER.LOCKED, technique: '區塊摒除', placed: false, eliminated: removed, digit: d,
-            reason: unitName(u) + '的 ' + d + ' 全部落在' + unitName(18 + box) + '，所以該宮其他格子可以刪掉 ' + d + '。'
+            reason: T('hint.claiming', { unit: unitName(u), d: d, box: unitName(18 + box) })
           };
         }
       }
@@ -458,11 +472,10 @@
             if (st.cand[c] & st.cand[ca]) { st.cand[c] &= ~st.cand[ca]; removed++; }
           }
           if (removed) {
-            var ds = maskToDigits(st.cand[ca]).join(' 和 ');
+            var ds = maskToDigits(st.cand[ca]).join(T('sep.and'));
             return {
               tier: TIER.LOCKED, technique: '裸對', placed: false, eliminated: removed,
-              reason: unitName(u) + '的 ' + cellName(ca) + '、' + cellName(cb) + ' 只能是 ' + ds +
-                '，所以同一單元其他格子不能再填這兩個數字。'
+              reason: T('hint.nakedPair', { unit: unitName(u), a: cellName(ca), b: cellName(cb), ds: ds })
             };
           }
         }
@@ -494,8 +507,8 @@
             if (removed) {
               return {
                 tier: TIER.ADVANCED, technique: '裸三', placed: false, eliminated: removed,
-                reason: unitName(u) + '的 ' + cellName(open[a]) + '、' + cellName(open[b]) + '、' + cellName(open[d]) +
-                  ' 三格只用得到 ' + maskToDigits(mask).join('、') + '，其他格子可以刪掉這些數字。'
+                reason: T('hint.nakedTriple', { unit: unitName(u), a: cellName(open[a]), b: cellName(open[b]), c: cellName(open[d]),
+                  ds: maskToDigits(mask).join(T('sep.list')) })
               };
             }
           }
@@ -525,8 +538,7 @@
           if (removed) {
             return {
               tier: TIER.ADVANCED, technique: '隱藏對', placed: false, eliminated: removed,
-              reason: unitName(u) + '裡只有 ' + cellName(spots1[0]) + ' 和 ' + cellName(spots1[1]) +
-                ' 放得下 ' + d1 + ' 與 ' + d2 + '，這兩格就只能是這兩個數字。'
+              reason: T('hint.hiddenPair', { unit: unitName(u), a: cellName(spots1[0]), b: cellName(spots1[1]), d1: d1, d2: d2 })
             };
           }
         }
@@ -572,8 +584,7 @@
           if (removed) {
             return {
               tier: TIER.ADVANCED, technique: 'X-Wing', placed: false, eliminated: removed, digit: d,
-              reason: '第 ' + (i + 1) + ' 列與第 ' + (j + 1) + ' 列的 ' + d + ' 都只能落在第 ' +
-                (cols[0] + 1) + '、' + (cols[1] + 1) + ' 行，這兩行其他格子可以刪掉 ' + d + '。'
+              reason: T('hint.xwingRow', { i: i + 1, j: j + 1, d: d, c1: cols[0] + 1, c2: cols[1] + 1 })
             };
           }
         }
@@ -602,8 +613,7 @@
           if (removed2) {
             return {
               tier: TIER.ADVANCED, technique: 'X-Wing', placed: false, eliminated: removed2, digit: d,
-              reason: '第 ' + (i + 1) + ' 行與第 ' + (j + 1) + ' 行的 ' + d + ' 都只能落在第 ' +
-                (rows[0] + 1) + '、' + (rows[1] + 1) + ' 列，這兩列其他格子可以刪掉 ' + d + '。'
+              reason: T('hint.xwingCol', { i: i + 1, j: j + 1, d: d, r1: rows[0] + 1, r2: rows[1] + 1 })
             };
           }
         }
@@ -768,8 +778,7 @@
         if (!grid[i]) {
           return {
             tier: TIER.GUESS, technique: '這裡邏輯推不下去', index: i, digit: solution[i], placed: true, viaTier: TIER.GUESS,
-            reason: '到這裡為止，唯一候選數、隱藏唯一數、區塊摒除、裸對、裸三、隱藏對與 X-Wing 都推不出下一格了，' +
-              '這種局面只能靠假設與試誤。先幫你把 ' + cellName(i) + ' 填成 ' + solution[i] + '，讓你接得下去。'
+            reason: T('hint.guess', { cell: cellName(i), d: solution[i] })
           };
         }
       }
@@ -939,7 +948,7 @@
     UNITS: UNITS, PEERS: PEERS,
     TIER: TIER, TIER_NAMES: TIER_NAMES, TIER_HINTS: TIER_HINTS,
     DIFFICULTIES: DIFFICULTIES, PRESETS: PRESETS,
-    emptyGrid: emptyGrid, cloneGrid: cloneGrid, cellName: cellName,
+    emptyGrid: emptyGrid, cloneGrid: cloneGrid, cellName: cellName, techLabel: techLabel,
     maskToDigits: maskToDigits, popcount: function (m) { return POPCOUNT[m]; },
     isLegal: isLegal, findConflicts: findConflicts, isFilled: isFilled, isSolved: isSolved,
     candidates: candidates, buildCandidates: buildCandidates,

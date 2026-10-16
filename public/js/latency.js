@@ -200,8 +200,9 @@
     const quality = ms === null ? 'unknown' : ms <= 30 ? 'good' : ms < 100 ? 'warn' : 'bad';
     el.classList.add('is-' + quality);
     el.querySelector('.latency-meter__value').textContent = ms === null ? '--' : String(ms);
-    el.setAttribute('aria-label', ms === null ? '連線延遲，等待回應' : '連線延遲 ' + ms + ' 毫秒');
-    el.title = ms === null ? '連線延遲：等待回應' : '連線延遲：' + ms + ' ms';
+    const tr = (key, params) => (window.I18N && window.I18N.t ? window.I18N.t(key, params) : key);
+    el.setAttribute('aria-label', ms === null ? tr('latency.waitAria') : tr('latency.aria', { ms: ms }));
+    el.title = ms === null ? tr('latency.waitTitle') : tr('latency.title', { ms: ms });
     dock();
   }
 

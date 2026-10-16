@@ -64,6 +64,22 @@ body{
   --d:6px;
 }
 .settings-fab .b3-lbl{font-size:1.3rem}
+/* 語言切換鈕（I18N.mountToggle 產生）：固定在設定鈕左側，尺寸、位置、風格與設定鈕同步 */
+.lang-toggle{
+  position:fixed;z-index:70;box-sizing:border-box;
+  top:calc(10px + env(safe-area-inset-top));
+  right:calc(12px + 52px + 8px + env(safe-area-inset-right));
+  width:52px;height:46px;padding:0;margin:0;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:3px solid var(--ink);border-radius:16px;background:var(--cream);color:var(--ink);
+  font:inherit;font-weight:900;font-size:.95rem;letter-spacing:.02em;line-height:1;cursor:pointer;
+  box-shadow:0 6px 0 var(--cream-d);
+  -webkit-appearance:none;appearance:none;-webkit-tap-highlight-color:transparent;
+  transition:transform .08s ease,box-shadow .08s ease,background .15s;
+}
+.lang-toggle:hover{background:#FFF6E8}
+.lang-toggle:active{transform:translateY(4px);box-shadow:0 2px 0 var(--cream-d)}
+.lang-toggle:focus-visible{outline:3px solid var(--sky-d);outline-offset:3px}
 .lobby-home-link{position:fixed;z-index:65;top:calc(10px + env(safe-area-inset-top));left:calc(12px + env(safe-area-inset-left));display:inline-flex;align-items:center;min-height:44px;padding:9px 14px;border:3px solid var(--ink);border-radius:14px;background:var(--cream);color:var(--ink);font-size:.8rem;font-weight:900;text-decoration:none;box-shadow:0 4px 0 var(--cream-d);transition:transform .15s,box-shadow .15s,background .15s}
 .lobby-home-link:hover{background:#FFF6E8;transform:translateY(-2px)}
 .lobby-home-link:active{transform:translateY(3px);box-shadow:0 1px 0 var(--cream-d)}
@@ -643,7 +659,8 @@ body{
 @media (orientation:landscape) and (max-height:520px){
   .settings-fab{top:calc(2px + env(safe-area-inset-top));--d:5px}
   .settings-fab.btn3d.icononly{min-height:44px;min-width:44px;padding:6px 9px calc(6px + var(--d))}
-  .gtop{display:flex;align-items:center;gap:8px;padding:4px 66px 0 8px}
+  .lang-toggle{top:calc(2px + env(safe-area-inset-top));right:calc(12px + 44px + 8px + env(safe-area-inset-right));width:44px;height:39px;border-radius:14px;box-shadow:0 5px 0 var(--cream-d);font-size:.85rem}
+  .gtop{display:flex;align-items:center;gap:8px;padding:4px 122px 0 8px}
   .gbar{flex:0 0 auto;padding:0;gap:6px}
   .statbar{flex:1;min-width:0;justify-content:flex-end;padding:0;gap:6px;flex-wrap:nowrap;overflow:hidden}
   #g-seed,#g-tech{display:none}
@@ -713,6 +730,7 @@ body{
 @media (max-width:560px){
   .settings-fab{top:calc(7px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));--d:5px}
   .settings-fab.btn3d.icononly{min-width:48px;min-height:48px;padding:8px 10px calc(8px + var(--d))}
+  .lang-toggle{top:calc(7px + env(safe-area-inset-top));right:calc(8px + 48px + 8px + env(safe-area-inset-right));width:48px;height:43px;border-radius:15px;box-shadow:0 5px 0 var(--cream-d)}
   .settings-modal{padding:10px}
   .settings-panel{width:100%;max-height:92dvh;border-radius:22px}
   .settings-head{padding:9px 10px 8px}
@@ -935,7 +953,7 @@ body{
   .chat-panel{max-height:88dvh;width:min(320px,60vw)}
   .chat-log{min-height:56px}
   #s-watch .gbar{padding:0;gap:6px}
-  #s-watch .gtop{display:flex;align-items:center;gap:8px;padding:4px 66px 0 8px}
+  #s-watch .gtop{display:flex;align-items:center;gap:8px;padding:4px 122px 0 8px}
   #s-watch .statbar{flex:1;min-width:0;justify-content:flex-end;padding:0;gap:6px;flex-wrap:nowrap;overflow:hidden}
   #w-diff,#w-code{display:none}
   .watchbody{padding:2px 7px 0;gap:8px}

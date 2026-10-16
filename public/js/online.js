@@ -33,24 +33,77 @@
   var pushing = false;
   var latencyProbeInFlight = false;
 
+  function T(key, params) {
+    return (w.I18N && w.I18N.t) ? w.I18N.t(key, params) : key;
+  }
+
+  /* 伺服器的錯誤回應帶 msgKey（字典 key）與 msgParams，前端直接翻譯；
+   * message 仍保留中文句子當相容備援：舊版伺服器沒有 msgKey 時，才用下面的「整句對照」找字典 key。 */
+  var SRV_EXACT = {
+    '不支援的方法。': 'srv.method',
+    '主持人身分驗證失敗。': 'srv.hostAuth',
+    '你已經不在這個房間裡了，請重新加入。': 'srv.notInRoom',
+    '只有開房的人可以更新盤面。': 'srv.hostOnlyUpdate',
+    '只有開房的人可以重新產生邀請連結。': 'srv.hostOnlyInvite',
+    '只有開房的人可以開始下一局。': 'srv.hostOnlyRound',
+    '只有開房的人可以關閉房間。': 'srv.hostOnlyClose',
+    '房號產生失敗，請再試一次。': 'srv.codeFail',
+    '找不到這個房間。': 'srv.noRoomShort',
+    '找不到這個房間，可能已經關閉了。': 'srv.noRoom',
+    '格子留言不能是空白。': 'srv.noteEmpty',
+    '格子留言太快了，稍等一下再送。': 'srv.noteFast',
+    '格子留言格式不正確。': 'srv.noteFormat',
+    '沒有這個端點。': 'srv.endpoint',
+    '沒有選到有效的格子。': 'srv.noteCell',
+    '盤面資料格式不正確。': 'srv.snapshot',
+    '盤面資料格式不正確，沒有建立房間。': 'srv.snapshotCreate',
+    '目前開著的房間已經達到上限，請稍後再試，或等別人關房。': 'srv.roomsFull',
+    '短時間內講太多話了，等幾秒再繼續。': 'srv.chatMany',
+    '短時間內送出太多格子留言了，等幾秒再繼續。': 'srv.noteMany',
+    '訊息是空的，沒有送出。': 'srv.chatEmpty',
+    '訊息送太快了，喘口氣再說。': 'srv.chatFast',
+    '送出的資料格式不正確。': 'srv.body',
+    '這個來源不在伺服器允許的名單裡（GAME_ALLOWED_ORIGIN）。': 'srv.origin',
+    '這個房間已經關閉了。': 'srv.closed',
+    '這個房間已經關閉了，留言沒有送出。': 'srv.closedNote',
+    '這個房間已經關閉了，訊息沒有送出。': 'srv.closedChat',
+    '這個房間的觀戰人數已滿，請稍後再試。': 'srv.viewersFull',
+    '這個邀請連結已經失效了（主持人重新產生過連結）。可以改用房號加入，或回大廳看看。': 'srv.inviteGone',
+    '這格的共享留言已經太多了。': 'srv.noteTooMany'
+  };
+  var SRV_PATTERN = [
+    [/^一則訊息最多 (\d+) 個字。$/, 'srv.chatLong', 'n'],
+    [/^每則格子留言最多 (\d+) 個字。$/, 'srv.noteLong', 'n'],
+    [/^找不到房號 (\S+)，可能已經關閉了。$/, 'srv.noCode', 'code']
+  ];
+  function srvMsg(msg) {
+    if (typeof msg !== 'string' || !msg) return msg;
+    if (SRV_EXACT[msg]) return T(SRV_EXACT[msg]);
+    for (var i = 0; i < SRV_PATTERN.length; i++) {
+      var m = SRV_PATTERN[i][0].exec(msg);
+      if (m) { var p = {}; p[SRV_PATTERN[i][2]] = m[1]; return T(SRV_PATTERN[i][1], p); }
+    }
+    return msg;
+  }
+
   function isEnabled() { return !!(C && C.isOnlineEnabled()); }
 
   /* 線上功能沒開時，要講清楚原因，不可以做成點了沒反應 */
   function disabledReason() {
-    if (!C) return '設定模組沒有載入，線上功能無法使用。';
+    if (!C) return T('err.noConfig');
     if (C.status === 'invalid') {
-      return '遊戲伺服器網址設定有誤，已自動改用單機模式。請檢查部署時注入的 GAME_SERVER_URL。';
+      return T('err.badUrl');
     }
     if (typeof w.EventSource !== 'function' || typeof w.fetch !== 'function') {
-      return '這個瀏覽器不支援線上觀戰需要的連線方式（EventSource／fetch），其他功能不受影響。';
+      return T('err.noSupport');
     }
-    return '目前是單機模式，還沒有設定遊戲伺服器，所以沒有線上房間可以看。';
+    return T('err.offline');
   }
 
   function apiUrl(path) { return C ? C.url(path) : null; }
 
   function friendlyNetworkError() {
-    return '連不上遊戲伺服器。免費方案的伺服器閒置一陣子會休眠，冷啟動大約要十幾秒，請稍等一下再試一次。';
+    return T('err.network');
   }
 
   /* ---------- 共用請求 ----------
@@ -92,12 +145,12 @@
       clearTimeout(timeout);
       if (wakeTimer) clearTimeout(wakeTimer);
       if (!r.data) {
-        return cb({ code: 'badjson', message: '伺服器回應格式看不懂，請稍後再試。', status: r.res.status }, null);
+        return cb({ code: 'badjson', message: T('err.badjson'), status: r.res.status }, null);
       }
       if (!r.res.ok || r.data.ok === false) {
         return cb({
           code: r.data.code || 'http' + r.res.status,
-          message: r.data.message || ('伺服器回應 ' + r.res.status + '，請稍後再試。'),
+          message: (r.data.msgKey ? T(r.data.msgKey, r.data.msgParams) : srvMsg(r.data.message)) || T('err.http', { status: r.res.status }),
           status: r.res.status
         }, null);
       }
@@ -290,7 +343,7 @@
         setConnState('failed', friendlyNetworkError());
         return;
       }
-      setConnState('retrying', '第 ' + session.retries + ' 次重試');
+      setConnState('retrying', T('conn.retryN', { n: session.retries }));
     });
   }
 
@@ -308,7 +361,7 @@
   /* 主持人主動關房：先通知伺服器，再收掉自己的連線 */
   function closeRoom(cb) {
     if (!session || session.role !== 'host') {
-      if (cb) cb({ code: 'norole', message: '目前不是主持人，沒有房間可以關閉。' }, null);
+      if (cb) cb({ code: 'norole', message: T('err.noHostClose') }, null);
       return;
     }
     var code = session.code;
@@ -323,7 +376,7 @@
   /* 主持人換下一局時保留同一個房間與觀戰者，不重新建立 SSE 連線。 */
   function restartRoom(payload, cb) {
     if (!session || session.role !== 'host') {
-      if (cb) cb({ code: 'norole', message: '目前不是主持人，沒有房間可以換題。' }, null);
+      if (cb) cb({ code: 'norole', message: T('err.noHostRound') }, null);
       return;
     }
     var body = Object.assign({}, payload || {}, { token: session.token });
@@ -333,21 +386,21 @@
   /* 重新產生邀請連結：舊連結立刻失效，房號仍然可以進來（房間是公開的） */
   function rotateInvite(cb) {
     if (!session || session.role !== 'host') {
-      return cb({ code: 'norole', message: '目前不是主持人。' }, null);
+      return cb({ code: 'norole', message: T('err.noHost') }, null);
     }
     request('POST', '/api/rooms/' + encodeURIComponent(session.code) + '/invite', { token: session.token }, cb);
   }
 
   /* ---------- 聊天 ---------- */
   function sendChat(text, name, cb) {
-    if (!session) return cb({ code: 'norole', message: '目前沒有連到任何房間。' }, null);
+    if (!session) return cb({ code: 'norole', message: T('err.noRoomConn') }, null);
     request('POST', '/api/rooms/' + encodeURIComponent(session.code) + '/chat', {
       token: session.token, text: text, name: name
     }, cb);
   }
 
   function sendNote(index, text, name, cb) {
-    if (!session) return cb({ code: 'norole', message: '目前沒有連到任何房間。' }, null);
+    if (!session) return cb({ code: 'norole', message: T('err.noRoomConn') }, null);
     request('POST', '/api/rooms/' + encodeURIComponent(session.code) + '/note', {
       token: session.token, index: index, text: text, name: name
     }, cb);

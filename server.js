@@ -182,13 +182,13 @@ const ROOM_PATH = /^\/api\/rooms\/([A-Za-z0-9]{1,8})(\/(stream|state|round|note|
 
 function handleApi(req, res, urlPath, query) {
   if (originBlocked(req)) {
-    return sendJson(req, res, 403, { ok: false, code: 'origin', message: '這個來源不在伺服器允許的名單裡（GAME_ALLOWED_ORIGIN）。' });
+    return sendJson(req, res, 403, { ok: false, code: 'origin', message: '這個來源不在伺服器允許的名單裡（GAME_ALLOWED_ORIGIN）。', msgKey: 'srv.origin' });
   }
 
   /* --- 統一在線人數 --- */
   if (urlPath === '/api/presence') {
     if (req.method === 'OPTIONS') return preflight(req, res, 'GET, OPTIONS');
-    if (req.method !== 'GET') return sendJson(req, res, 405, { ok: false, message: '不支援的方法。' });
+    if (req.method !== 'GET') return sendJson(req, res, 405, { ok: false, message: '不支援的方法。', msgKey: 'srv.method' });
     const connected = [...clients.values()].flatMap((set) => [...set]);
     return sendJson(req, res, 200, {
       gameId: 'sudoku',
@@ -214,17 +214,17 @@ function handleApi(req, res, urlPath, query) {
     }
     if (req.method === 'POST') {
       return readJson(req, (err, body) => {
-        if (err) return sendJson(req, res, 400, { ok: false, code: 'body', message: '送出的資料格式不正確。' });
+        if (err) return sendJson(req, res, 400, { ok: false, code: 'body', message: '送出的資料格式不正確。', msgKey: 'srv.body' });
         const result = store.createRoom(body);
         if (!result.ok) return sendJson(req, res, result.code === 'full' ? 503 : 400, result);
         return sendJson(req, res, 201, result);
       });
     }
-    return sendJson(req, res, 405, { ok: false, message: '不支援的方法。' });
+    return sendJson(req, res, 405, { ok: false, message: '不支援的方法。', msgKey: 'srv.method' });
   }
 
   const m = ROOM_PATH.exec(urlPath);
-  if (!m) return sendJson(req, res, 404, { ok: false, code: 'nosuch', message: '沒有這個端點。' });
+  if (!m) return sendJson(req, res, 404, { ok: false, code: 'nosuch', message: '沒有這個端點。', msgKey: 'srv.endpoint' });
 
   const code = m[1].toUpperCase();
   const action = m[3] || '';
@@ -232,25 +232,25 @@ function handleApi(req, res, urlPath, query) {
   /* --- SSE --- */
   if (action === 'stream') {
     if (req.method === 'OPTIONS') return preflight(req, res, 'GET, OPTIONS');
-    if (req.method !== 'GET') return sendJson(req, res, 405, { ok: false, message: '不支援的方法。' });
+    if (req.method !== 'GET') return sendJson(req, res, 405, { ok: false, message: '不支援的方法。', msgKey: 'srv.method' });
     return openStream(req, res, code, query);
   }
 
   if (action === '') {
     if (req.method === 'OPTIONS') return preflight(req, res, 'GET, OPTIONS');
-    if (req.method !== 'GET') return sendJson(req, res, 405, { ok: false, message: '不支援的方法。' });
+    if (req.method !== 'GET') return sendJson(req, res, 405, { ok: false, message: '不支援的方法。', msgKey: 'srv.method' });
     const room = store.getRoom(code);
     if (!room || room.status === 'closed') {
-      return sendJson(req, res, 404, { ok: false, code: 'nosuch', message: '找不到房號 ' + code + '，可能已經關閉了。' });
+      return sendJson(req, res, 404, { ok: false, code: 'nosuch', message: '找不到房號 ' + code + '，可能已經關閉了。', msgKey: 'srv.noCode', msgParams: { code: code } });
     }
     return sendJson(req, res, 200, { ok: true, room: store.publicRoom(room) });
   }
 
   if (req.method === 'OPTIONS') return preflight(req, res, 'POST, OPTIONS');
-  if (req.method !== 'POST') return sendJson(req, res, 405, { ok: false, message: '不支援的方法。' });
+  if (req.method !== 'POST') return sendJson(req, res, 405, { ok: false, message: '不支援的方法。', msgKey: 'srv.method' });
 
   return readJson(req, (err, body) => {
-    if (err) return sendJson(req, res, 400, { ok: false, code: 'body', message: '送出的資料格式不正確。' });
+    if (err) return sendJson(req, res, 400, { ok: false, code: 'body', message: '送出的資料格式不正確。', msgKey: 'srv.body' });
     const data = body || {};
     let result;
     if (action === 'state') result = store.updateState(code, data.token, data.snapshot);
@@ -259,7 +259,7 @@ function handleApi(req, res, urlPath, query) {
     else if (action === 'chat') result = store.chat(code, data.token, data.text, data.name);
     else if (action === 'close') result = store.closeRoom(code, data.token, 'host');
     else if (action === 'invite') result = store.rotateInvite(code, data.token);
-    else return sendJson(req, res, 404, { ok: false, message: '沒有這個端點。' });
+    else return sendJson(req, res, 404, { ok: false, message: '沒有這個端點。', msgKey: 'srv.endpoint' });
 
     if (!result.ok) return sendJson(req, res, result.status || 400, result);
     return sendJson(req, res, 200, result);

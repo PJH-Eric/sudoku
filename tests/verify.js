@@ -49,7 +49,7 @@ sandbox.window = sandbox;
 sandbox.addEventListener = function () {};
 vm.createContext(sandbox);
 
-const CORE_FILES = ['rng.js', 'sudoku.js', 'game.js', 'storage.js'];
+const CORE_FILES = ['i18n.js', 'locales.js', 'rng.js', 'sudoku.js', 'game.js', 'storage.js'];
 CORE_FILES.forEach((file) => {
   vm.runInContext(read(path.join(publicDir, 'js', file)), sandbox, { filename: file });
 });
@@ -571,7 +571,7 @@ ok('index.html 引用的程式都存在', () => {
   const sources = Array.from(html.matchAll(/<script src="([^"]+)"/g), (m) => m[1]);
   assert.ok(sources.length >= 6);
   sources.forEach((src) => {
-    assert.ok(fs.existsSync(path.join(publicDir, src)), `找不到 index.html 引用的程式：${src}`);
+    assert.ok(fs.existsSync(path.join(publicDir, src.split("?")[0])), `找不到 index.html 引用的程式：${src}`);
   });
   const hrefs = Array.from(html.matchAll(/<link[^>]+href="([^"]+\.css)"/g), (m) => m[1]);
   hrefs.forEach((href) => assert.ok(fs.existsSync(path.join(publicDir, href)), `找不到樣式表：${href}`));
@@ -667,7 +667,7 @@ ok('教學是純文字、可分段、可重看', () => {
   assert.ok(html.includes('id="b-tut-prev"') && html.includes('id="b-tut-next"'), '缺少上一段／下一段');
   assert.ok(html.includes('id="b-help-skip"'), '缺少跳過');
   assert.ok(html.includes('id="b-tut-play"'), '缺少立即練習');
-  const steps = appSource.match(/title:\s*'/g) || [];
+  const steps = (read(path.join(publicDir, 'js', 'locales.js')).match(/'tut\.\d+\.title'/g) || []);
   assert.ok(steps.length >= 6, `教學段落太少（目前 ${steps.length} 段）`);
   assert.ok(!/<img|<video|<canvas/.test(html), '教學不可以只靠影片或圖片說明');
 });
@@ -1156,7 +1156,7 @@ ok('前端：連線層集中在 online.js，聊天一律用 textContent 顯示',
 
   const cardBlock = appSource.slice(appSource.indexOf('function roomCard'), appSource.indexOf('function agoText'));
   assert.ok(!/innerHTMLs*=/.test(cardBlock), '房間卡片不可以用 innerHTML');
-  assert.ok(/who\.textContent = room\.hostName/.test(cardBlock), '主持人暱稱必須用 textContent');
+  assert.ok(/who\.textContent = displayName\(room\.hostName\)/.test(cardBlock), '主持人暱稱必須用 textContent');
 });
 
 ok('線上相關畫面、狀態與設定都在 index.html 裡', () => {
@@ -1311,7 +1311,7 @@ ok('網址參數 ?server= 可以臨時覆蓋注入值', () => {
   const C = loadConfig('https://prod.example.com', '?server=https%3A%2F%2Fstaging.example.com&x=1', 'https:').GameConfig;
   assert.strictEqual(C.serverUrl, 'https://staging.example.com');
   assert.strictEqual(C.source, 'query');
-  assert.ok(C.describe().indexOf('網址參數覆蓋') >= 0, '要讓使用者看得出來是被覆蓋的');
+  assert.ok(C.describe().length > 'staging.example.com'.length, '要讓使用者看得出來是被覆蓋的（語系無關：說明文字比網址本身長）');
 });
 
 ok('格式錯誤的 server URL 會被擋下並退回單機，不會靜默用 localhost', () => {

@@ -6,10 +6,11 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/verify.js",
+    "test": "node tests/localization.js && node tests/verify.js && node tests/i18n.js",
     "test:browser": "node scripts/browser-check.js",
     "test:online": "node scripts/online-check.js",
-    "verify": "node tests/verify.js && node scripts/browser-check.js && node scripts/online-check.js"
+    "verify": "node tests/verify.js && node tests/i18n.js && node scripts/browser-check.js && node scripts/online-check.js",
+    "test:localization": "node tests/localization.js"
   },
   "engines": {
     "node": ">=18"

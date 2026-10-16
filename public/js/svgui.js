@@ -88,8 +88,13 @@
   }
 
   /* ---- 標題 LOGO：一隻抱著數獨盤的小貓 ---- */
+  function tr(key) { return (w.I18N && w.I18N.t) ? w.I18N.t(key) : key; }
   function logo() {
-    return '<svg viewBox="0 0 560 210" role="img" aria-label="數獨小學堂">' +
+    /* 英文名稱比較長：縮小字級與字距，避免壓到左右兩側的小貓與數獨盤 */
+    var en = !!(w.I18N && w.I18N.lang === 'en');
+    var tSize = en ? 42 : 60, tSpace = en ? 2 : 6, sSize = en ? 17 : 21, sSpace = en ? 3 : 8;
+    var title = tr('app.name'), sub = tr('logo.sub');
+    return '<svg viewBox="0 0 560 210" role="img" aria-label="' + tr('app.name') + '">' +
       /* 左側小貓 */
       '<g transform="translate(20 44)">' +
         '<path d="M14 26 L10 4 L34 16 Z" fill="#FFD9C2" stroke="' + INK + '" stroke-width="5" stroke-linejoin="round"/>' +
@@ -109,20 +114,20 @@
         '<rect x="60" y="60" width="22" height="22" rx="6" fill="#FFE3A0"/>' +
       '</g>' +
       /* 標題文字：先描邊再填色，保持文字可讀且可本地化 */
-      '<text x="280" y="92" text-anchor="middle" font-size="60" font-weight="900" letter-spacing="6" ' +
+      '<text x="280" y="92" text-anchor="middle" font-size="' + tSize + '" font-weight="900" letter-spacing="' + tSpace + '" ' +
         'style="paint-order:stroke;stroke:' + INK + ';stroke-width:14px;stroke-linejoin:round" fill="#C9B6F5" ' +
-        'font-family="Yuanti TC, PingFang TC, Microsoft JhengHei, Noto Sans TC, sans-serif">數獨小學堂</text>' +
-      '<text x="280" y="92" text-anchor="middle" font-size="60" font-weight="900" letter-spacing="6" fill="#F3ECFF" ' +
-        'font-family="Yuanti TC, PingFang TC, Microsoft JhengHei, Noto Sans TC, sans-serif">數獨小學堂</text>' +
-      '<text x="280" y="134" text-anchor="middle" font-size="21" font-weight="800" letter-spacing="8" fill="#7A6A88" ' +
-        'font-family="Yuanti TC, PingFang TC, Microsoft JhengHei, Noto Sans TC, sans-serif">9 × 9 · 唯一解 · 慢慢想</text>' +
+        'font-family="Yuanti TC, PingFang TC, Microsoft JhengHei, Noto Sans TC, sans-serif">' + title + '</text>' +
+      '<text x="280" y="92" text-anchor="middle" font-size="' + tSize + '" font-weight="900" letter-spacing="' + tSpace + '" fill="#F3ECFF" ' +
+        'font-family="Yuanti TC, PingFang TC, Microsoft JhengHei, Noto Sans TC, sans-serif">' + title + '</text>' +
+      '<text x="280" y="134" text-anchor="middle" font-size="' + sSize + '" font-weight="800" letter-spacing="' + sSpace + '" fill="#7A6A88" ' +
+        'font-family="Yuanti TC, PingFang TC, Microsoft JhengHei, Noto Sans TC, sans-serif">' + sub + '</text>' +
       '<path d="M160 158 h240" stroke="#C9B6F5" stroke-width="7" stroke-linecap="round" fill="none" opacity="0.65"/>' +
       '</svg>';
   }
 
   /* ---- 勝利獎盃 ---- */
   function trophy() {
-    return '<svg viewBox="0 0 120 120" role="img" aria-label="完成獎盃">' +
+    return '<svg viewBox="0 0 120 120" role="img" aria-label="' + tr('app.trophy') + '">' +
       '<path d="M30 20 h60 v22 a30 30 0 0 1 -60 0 Z" fill="#FFE3A0" stroke="' + INK + '" stroke-width="5" stroke-linejoin="round"/>' +
       '<path d="M30 26 h-14 a14 14 0 0 0 14 22" fill="none" stroke="' + INK + '" stroke-width="5" stroke-linecap="round"/>' +
       '<path d="M90 26 h14 a14 14 0 0 1 -14 22" fill="none" stroke="' + INK + '" stroke-width="5" stroke-linecap="round"/>' +

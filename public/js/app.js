@@ -8,6 +8,7 @@
   var S = w.Sudoku;
   var G = w.SudokuGame;
 
+  function tr(key, params) { return w.I18N.t(key, params); }
   function q(id) { return D.getElementById(id); }
   function qa(sel, root) { return Array.prototype.slice.call((root || D).querySelectorAll(sel)); }
 
@@ -32,72 +33,14 @@
   var pendingDifficulty = w.Store.loadLastDifficulty() || 'beginner';
   var tutStep = 0;
 
-  var DIFF_LABEL = { beginner: '新手入門', easy: '簡單', medium: '普通', hard: '困難', expert: '專家' };
+  function diffLabel(d) { return S.PRESETS[d] ? tr('diff.' + d) : (d || ''); }
+  function techName(name) { return S.techLabel ? S.techLabel(name) : (name || ''); }
+  /* 玩家輸入的暱稱不翻譯；只有「沒填暱稱時的預設名」依語言顯示 */
+  var DEFAULT_NICKS = { '路過的觀眾': 'nick.default', '匿名主持人': 'nick.anonHost' };
+  function displayName(name) { return DEFAULT_NICKS[name] ? tr(DEFAULT_NICKS[name]) : name; }
 
-  /* ---------- 純文字教學 ---------- */
-  var TUTORIAL = [
-    {
-      title: '目標是什麼？',
-      body: [
-        '盤面是 9 列 × 9 行，被粗線分成 9 個 3×3 的「宮」。',
-        '要把每一個空格填上 1 到 9，讓每一列、每一行、每一宮裡面的 1 到 9 都剛好各出現一次。',
-        '全部填滿而且沒有重複，這一局就完成了。'
-      ]
-    },
-    {
-      title: '怎麼填數字？',
-      body: [
-        '第一步：用手指點（或滑鼠按）一個空格，那一格會被框起來，代表現在選中它。',
-        '第二步：按畫面下方數字盤上的 1 到 9，數字就會填進去。',
-        '用鍵盤也可以：方向鍵移動選格，直接按 1 到 9 填入。',
-        '再按一次同一個數字，就等於把它取消。'
-      ]
-    },
-    {
-      title: '填錯了會怎樣？',
-      body: [
-        '題目一開始就印好的數字是灰底的，點它會顯示「這格是題目原本就給的數字，不能修改」，盤面不會有任何變動。',
-        '如果填的數字跟同一列、同一行或同一宮已經有的數字重複，那兩格會一起變成紅色。',
-        '預設還會即時比對答案：填錯的數字會標紅，畫面下方也會用文字告訴你哪一格錯了。',
-        '不想被劇透的話，可以到右上角 ⚙ 設定關掉「即時標示填錯」，改成自己檢查。'
-      ]
-    },
-    {
-      title: '筆記（候選數）',
-      body: [
-        '按下工具列的「筆記」按鈕，按鈕會顯示「開」，這時候按數字不會真的填進去，而是在格子角落記下小小的候選數。',
-        '想不出來的時候，先把一格所有可能的數字記下來，之後刪到剩一個，那格答案就出來了。',
-        '再按一次「筆記」就會切回正常填入模式。',
-        '預設開啟「自動整理筆記」：你填入一個數字後，同列、同行、同宮的相同筆記會自動被清掉。'
-      ]
-    },
-    {
-      title: '清除、復原、重做',
-      body: [
-        '「清除」會把選中格子的數字和筆記一起清空（鍵盤 Backspace 或 Delete 也可以）。',
-        '「復原」回到上一步，「重做」再做回來，隨時可以反悔，不會弄壞盤面。',
-        '暫停畫面裡的「這題重來」會把整題恢復成一開始的樣子，時間和計數也一起歸零。'
-      ]
-    },
-    {
-      title: '提示怎麼用？',
-      body: [
-        '按「提示」會直接幫你填好一格，同時用文字說明「為什麼是這個數字」，例如「第 3 宮裡面只有 R2C5 放得下 7」。',
-        '如果盤面上已經有填錯的數字，提示會先幫你抓出那一格，因為錯的數字會讓後面的推理全部走歪。',
-        '提示次數不限制，但會記在結算畫面上，想挑戰的話就少用一點。'
-      ]
-    },
-    {
-      title: '難度、種子與設定',
-      body: [
-        '五種難度不是只有空格數量不同，而是「解得下去所需要的技巧」與「會卡住幾次」都不同：新手入門大多是「整列或整宮只剩一格」，一眼就看得到；簡單全程只要「這格只剩一個數字可填」；普通會卡住好幾次，要找「這一宮只有這格放得下 X」；困難整局都要用區塊摒除、裸對先刪候選數；專家的盤面不對稱、卡點更多更早，還可能用到裸三或 X-Wing。',
-        '出題畫面可以輸入「種子」。同一組種子加上同一個難度，永遠會拿到同一題，可以跟朋友比同一題誰快。',
-        '右上角的 ⚙ 在每個畫面都在，可以分別調整背景音樂與音效的開關和音量、留言提示音、觸控震動、動畫、暱稱，以及盤面要不要幫你標示與高亮。',
-        '主選單的「線上觀戰與留言」可以看別人解題、順便聊天；也可以自己開一間房，把連結傳給朋友讓他們進來看你解。這需要有設定遊戲伺服器，沒有設定時畫面會直接說明原因。',
-        '離開遊戲不用擔心：目前這一題會存在這台裝置上，下次回來主選單按「繼續上一題」就能接著玩。'
-      ]
-    }
-  ];
+  /* ---------- 純文字教學（字典在 locales.js：tut.<段>.title / tut.<段>.<行>） ---------- */
+  var TUT_LINES = [3, 4, 4, 4, 3, 3, 5];
 
   /* ---------- 小工具 ---------- */
   function fmtTime(ms) {
@@ -108,11 +51,17 @@
     return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
   }
 
+  var lastSay = null;   // 靜態訊息記下 key，切換語言時可以重畫
   function say(message, kind) {
     var host = q('feedback');
+    lastSay = null;
     if (!host) return;
     host.textContent = message;
     host.className = 'feedback' + (kind ? ' ' + kind : '');
+  }
+  function sayKey(key, params, kind) {
+    say(tr(key, params), kind);
+    lastSay = { key: key, params: params, kind: kind };
   }
 
   function toast(message) {
@@ -148,7 +97,7 @@
     var btn = q('b-continue');
     if (saved && saved.status !== 'won') {
       btn.hidden = false;
-      w.UI.setLabel(btn, '<span class="ico">▶</span>繼續上一題（' + (DIFF_LABEL[saved.difficulty] || '') + '）');
+      w.UI.setLabel(btn, '<span class="ico">▶</span>' + tr('menu.continueDiff', { d: diffLabel(saved.difficulty) }));
       setTimeout(function () { w.UI.paint(btn); }, 0);
     } else {
       btn.hidden = true;
@@ -158,10 +107,8 @@
     var helpBtn = q('b-help');
     w.UI.setColor(helpBtn, firstTime ? 'lemon' : 'sky');
     q('home-note').textContent = !w.Store.available
-      ? '這個瀏覽器停用了本機儲存，設定與進度不會被保留，但遊戲仍然完整可玩。'
-      : (firstTime
-        ? '第一次玩嗎？先點「玩法教學」，七段純文字說明大約一分鐘看完。'
-        : '全部題目都保證只有一組答案，離開再回來也能接著玩。');
+      ? tr('home.noteNoStorage')
+      : (firstTime ? tr('home.noteFirst') : tr('home.noteReturn'));
   }
 
   function openHelp() {
@@ -185,7 +132,7 @@
     corner.className = 'cell-note-corner';
     corner.setAttribute('role', 'button');
     corner.setAttribute('tabindex', '-1');
-    corner.setAttribute('aria-label', '查看這格的格子留言');
+    corner.setAttribute('aria-label', tr('cell.noteView'));
     var count = D.createElement('span');
     count.className = 'cell-note-count';
     corner.appendChild(count);
@@ -196,7 +143,7 @@
     popover.setAttribute('role', 'status');
     var title = D.createElement('b');
     title.className = 'cell-note-popover-title';
-    title.textContent = '格子留言';
+    title.textContent = tr('cell.noteTitle');
     var items = D.createElement('span');
     items.className = 'cell-note-items';
     popover.appendChild(title);
@@ -257,7 +204,7 @@
       b.setAttribute('data-color', 'grape');
       b.setAttribute('data-d', String(d));
       b.innerHTML = '<span class="nk">' + d + '</span><span class="nleft" aria-hidden="true"></span>';
-      b.setAttribute('aria-label', '填入數字 ' + d);
+      b.setAttribute('aria-label', tr('pad.fill', { d: d }));
       pad.appendChild(b);
       padButtons.push(b);
     }
@@ -308,7 +255,7 @@
       renderCellNotes(el, host, i, hostNoteOpenIndex === i);
       var shared = notesFor(host, i);
       el.setAttribute('aria-label', cellLabel(i, v, mask, conflicts[i], wrong && wrong[i]) +
-        (shared.length ? '，有 ' + shared.length + ' 則格子留言' : ''));
+        (shared.length ? tr('sep.comma') + tr('cell.shared', { n: shared.length }) : ''));
     }
     renderStatus();
   }
@@ -323,13 +270,14 @@
   }
 
   function cellLabel(i, v, mask, conflict, isWrong) {
-    var pos = '第 ' + (S.ROW_OF[i] + 1) + ' 列第 ' + (S.COL_OF[i] + 1) + ' 行';
+    var sep = tr('sep.comma');
+    var pos = tr('cell.pos', { r: S.ROW_OF[i] + 1, c: S.COL_OF[i] + 1 });
     if (v) {
-      return pos + '，' + (state.given[i] ? '題目給的 ' : '') + v +
-        (conflict ? '，和同列行宮重複' : '') + (isWrong ? '，和答案不符' : '');
+      return pos + sep + (state.given[i] ? tr('cell.givenPrefix') : '') + v +
+        (conflict ? sep + tr('cell.conflict') : '') + (isWrong ? sep + tr('cell.wrong') : '');
     }
-    if (mask) return pos + '，空格，筆記 ' + S.maskToDigits(mask).join('、');
-    return pos + '，空格';
+    if (mask) return pos + sep + tr('cell.empty') + sep + tr('cell.notes', { list: S.maskToDigits(mask).join(tr('sep.list')) });
+    return pos + sep + tr('cell.empty');
   }
 
   function renderStatus() {
@@ -339,9 +287,9 @@
     q('st-hint').textContent = String(state.hintsUsed);
     q('st-miss').textContent = String(state.mistakes);
     q('st-time').textContent = fmtTime(state.elapsedMs);
-    q('g-diff').textContent = state.label || DIFF_LABEL[state.difficulty] || '';
-    q('g-seed').textContent = '種子 ' + state.seed;
-    q('g-tech').textContent = state.technique || '';
+    q('g-diff').textContent = S.PRESETS[state.difficulty] ? diffLabel(state.difficulty) : (state.label || '');
+    q('g-seed').textContent = tr('game.seed', { seed: state.seed });
+    q('g-tech').textContent = techName(state.technique);
     q('b-undo').disabled = !state.history.length;
     q('b-redo').disabled = !state.future.length;
 
@@ -353,8 +301,8 @@
       var span = btn.querySelector('.nleft');
       if (span) span.textContent = rest > 0 ? String(rest) : '✓';
       btn.classList.toggle('done', rest <= 0);
-      btn.setAttribute('aria-label', (noteMode ? '記下候選數 ' : '填入數字 ') + d +
-        (rest > 0 ? '，還有 ' + rest + ' 格' : '，這個數字已經填完'));
+      btn.setAttribute('aria-label', tr(noteMode ? 'pad.note' : 'pad.fill', { d: d }) +
+        tr('sep.comma') + (rest > 0 ? tr('pad.left', { n: rest }) : tr('pad.done')));
     }
   }
 
@@ -419,8 +367,8 @@
   function inputDigit(d) {
     if (!state || paused) return;
     if (selected < 0) {
-      say('請先點一個空格，再按數字。', 'bad');
-      toast('請先點一個空格');
+      sayKey('msg.pickCell', null, 'bad');
+      toast(tr('toast.pickCell'));
       w.Sound.play('blocked');
       return;
     }
@@ -437,7 +385,7 @@
   function doErase() {
     if (!state || paused) return;
     if (selected < 0) {
-      say('請先點一個格子，再按清除。', 'bad');
+      sayKey('msg.pickCellErase', null, 'bad');
       w.Sound.play('blocked');
       return;
     }
@@ -486,8 +434,8 @@
     b.setAttribute('aria-pressed', noteMode ? 'true' : 'false');
     b.classList.toggle('on', noteMode);
     w.UI.setColor(b, noteMode ? 'grape' : 'sky');
-    q('note-tag').textContent = noteMode ? '開' : '關';
-    say(noteMode ? '筆記模式已開啟：按數字只會在角落記候選數。' : '筆記模式已關閉：按數字會直接填入格子。', 'good');
+    q('note-tag').textContent = noteMode ? tr('common.on') : tr('common.off');
+    sayKey(noteMode ? 'msg.noteModeOn' : 'msg.noteModeOff', null, 'good');
     w.Sound.play('click');
   }
 
@@ -538,7 +486,7 @@
     }
     pendingDifficulty = difficulty;
     w.Store.saveLastDifficulty(difficulty);
-    q('loading-note').textContent = '正在為「' + (DIFF_LABEL[difficulty] || difficulty) + '」挖洞並驗證唯一解…';
+    q('loading-note').textContent = tr('loading.noteDiff', { d: diffLabel(difficulty) });
     go('s-loading');
     /* 讓載入畫面先畫出來，再做比較重的出題運算 */
     setTimeout(function () {
@@ -549,7 +497,7 @@
         puzzle = null;
       }
       if (!puzzle || !puzzle.puzzle) {
-        q('error-note').textContent = '出題時發生問題，請再試一次，或換一個難度。';
+        q('error-note').textContent = tr('error.noteLong');
         go('s-error');
         return;
       }
@@ -566,7 +514,7 @@
   function restartHostRoom() {
     if (!host || !state) return;
     var code = host.code;
-    setHostConn('connecting', '同步新題目…');
+    setHostConn('connecting', 'conn.syncing');
     w.Online.restartRoom({
       difficulty: state.difficulty,
       label: state.label,
@@ -576,13 +524,13 @@
     }, function (err) {
       if (!host || host.code !== code) return;
       if (err) {
-        say('房間換題失敗：' + err.message + '，這一局先以單機繼續。', 'bad');
-        toast('房間換題失敗');
+        say(tr('room.restartFail', { msg: err.message }), 'bad');
+        toast(tr('toast.restartFail'));
         endHostRoom(false);
         return;
       }
-      setHostConn('open', '已連線');
-      say('新一局開始了，房號 ' + code + ' 不變，觀戰者可以繼續觀看。', 'good');
+      setHostConn('open');
+      sayKey('room.restartOk', { code: code }, 'good');
       w.Online.startStatePush(hostSnapshot);
     });
   }
@@ -602,9 +550,9 @@
     saveNow();
     if (isNew) {
       w.Sound.play('start');
-      say('新題目來了！點一個空格，再按下面的數字就能填入。', 'good');
+      sayKey('msg.newPuzzle', null, 'good');
     } else {
-      say('接著上次的進度繼續，加油！', 'good');
+      sayKey('msg.resumed', null, 'good');
     }
     if (w.Sound.isMusicOn()) w.Sound.startBgm('game');
   }
@@ -614,7 +562,7 @@
     var restored = data ? G.deserialize(data) : null;
     if (!restored) {
       w.Store.clearGame();
-      toast('找不到可以繼續的題目，幫你開一題新的。');
+      toast(tr('toast.noSaved'));
       startNewGame(pendingDifficulty, '');
       return;
     }
@@ -637,12 +585,12 @@
       saveNow();
       w.Sound.play('pause');
       setTimeout(function () { q('pause-box').focus(); }, 20);
-      say('遊戲已暫停，計時停住了。', 'good');
+      sayKey('msg.paused', null, 'good');
       pushHostState();
     } else {
       startTimer();
       w.Sound.play('resume');
-      say('繼續囉！', 'good');
+      sayKey('msg.resumedPlay', null, 'good');
       pushHostState();
       if (pauseLastFocus && pauseLastFocus.focus) pauseLastFocus.focus();
       pauseLastFocus = null;
@@ -658,22 +606,31 @@
     var rec = w.Store.recordWin(state.difficulty, state.elapsedMs, {
       hints: state.hintsUsed, mistakes: state.mistakes, seed: state.seed
     });
+    lastRec = rec;
+    renderResult();
+    go('s-result');
+  }
+
+  var lastRec = null;
+  /* 結算畫面的文字：切換語言時用同一份資料重畫 */
+  function renderResult() {
+    if (!state || !lastRec) return;
+    var rec = lastRec;
     q('res-trophy').innerHTML = w.UI.trophy();
-    q('res-title').textContent = rec.isNew ? '新紀錄！完成了！' : '完成了！';
-    q('res-sub').textContent = '每一列、每一行、每一宮的 1 到 9 都剛好各一個。';
+    q('res-title').textContent = rec.isNew ? tr('result.titleNew') : tr('result.title');
+    q('res-sub').textContent = tr('result.sub');
     var rows = [
-      ['難度', (state.label || '') + '（' + (state.technique || '') + '）'],
-      ['花費時間', fmtTime(state.elapsedMs)],
-      ['提示次數', state.hintsUsed + ' 次'],
-      ['填錯次數', state.mistakes + ' 次'],
-      ['題目種子', state.seed],
-      ['這個難度最佳', fmtTime(rec.best) + (rec.isNew ? '（就是這一局）' : '')],
-      ['累計完成', rec.count + ' 題']
+      [tr('result.diff'), tr('result.diffVal', { d: S.PRESETS[state.difficulty] ? diffLabel(state.difficulty) : (state.label || ''), t: techName(state.technique) })],
+      [tr('result.time'), fmtTime(state.elapsedMs)],
+      [tr('result.hints'), tr('result.times', { n: state.hintsUsed })],
+      [tr('result.misses'), tr('result.times', { n: state.mistakes })],
+      [tr('result.seed'), state.seed],
+      [tr('result.best'), fmtTime(rec.best) + (rec.isNew ? tr('result.thisRun') : '')],
+      [tr('result.total'), tr('result.puzzles', { n: rec.count })]
     ];
     q('res-stats').innerHTML = rows.map(function (r, i) {
       return '<div class="row' + (rec.isNew && i === 5 ? ' best' : '') + '"><span>' + r[0] + '</span><b>' + r[1] + '</b></div>';
     }).join('');
-    go('s-result');
   }
 
   /* ---------- 我的紀錄 ---------- */
@@ -684,15 +641,15 @@
     S.DIFFICULTIES.forEach(function (d) {
       var b = best[d];
       var count = best[d + '_count'] || 0;
-      html += '<div class="rankgrp"><h4>' + DIFF_LABEL[d] + '</h4>';
+      html += '<div class="rankgrp"><h4>' + diffLabel(d) + '</h4>';
       if (b) {
-        html += '<div class="r"><span>最佳時間</span><b>' + fmtTime(b.ms) + '</b></div>';
-        html += '<div class="r"><span>那一局的提示／填錯</span><b>' + (b.hints | 0) + ' ／ ' + (b.mistakes | 0) + '</b></div>';
-        html += '<div class="r"><span>題目種子</span><b>' + (b.seed || '—') + '</b></div>';
+        html += '<div class="r"><span>' + tr('stats.bestTime') + '</span><b>' + fmtTime(b.ms) + '</b></div>';
+        html += '<div class="r"><span>' + tr('stats.hintsMiss') + '</span><b>' + (b.hints | 0) + ' / ' + (b.mistakes | 0) + '</b></div>';
+        html += '<div class="r"><span>' + tr('result.seed') + '</span><b>' + (b.seed || '—') + '</b></div>';
       } else {
-        html += '<div class="r empty-row"><span>還沒有完成紀錄</span><b>—</b></div>';
+        html += '<div class="r empty-row"><span>' + tr('stats.none') + '</span><b>—</b></div>';
       }
-      html += '<div class="r"><span>累計完成</span><b>' + count + ' 題</b></div>';
+      html += '<div class="r"><span>' + tr('result.total') + '</span><b>' + tr('result.puzzles', { n: count }) + '</b></div>';
       html += '</div>';
     });
     host.innerHTML = html;
@@ -700,12 +657,14 @@
 
   /* ---------- 教學 ---------- */
   function renderTutorial() {
-    var stepData = TUTORIAL[tutStep];
-    q('tut-progress').textContent = '第 ' + (tutStep + 1) + ' 段 / 共 ' + TUTORIAL.length + ' 段';
-    q('tut-title').textContent = stepData.title;
-    q('tut-body').innerHTML = stepData.body.map(function (p) { return '<p>' + p + '</p>'; }).join('');
+    var total = TUT_LINES.length;
+    q('tut-progress').textContent = tr('tut.progress', { n: tutStep + 1, total: total });
+    q('tut-title').textContent = tr('tut.' + tutStep + '.title');
+    var paras = [];
+    for (var li = 0; li < TUT_LINES[tutStep]; li++) paras.push('<p>' + tr('tut.' + tutStep + '.' + li) + '</p>');
+    q('tut-body').innerHTML = paras.join('');
     q('b-tut-prev').disabled = tutStep === 0;
-    w.UI.setLabel(q('b-tut-next'), tutStep === TUTORIAL.length - 1 ? '重看第一段 ↻' : '下一段 ▶');
+    w.UI.setLabel(q('b-tut-next'), tutStep === total - 1 ? tr('help.again') : tr('help.next'));
     setTimeout(function () { w.UI.repaintAll(q('s-help')); }, 10);
   }
 
@@ -737,25 +696,20 @@
   var chatLastFocus = null;
   var lastWatchValues = '';
 
-  var CONN_TEXT = {
-    idle: '尚未連線',
-    connecting: '連線中…',
-    waking: '伺服器喚醒中…（免費方案冷啟動要十幾秒）',
-    open: '已連線',
-    retrying: '連線中斷，重試中…',
-    failed: '連不上伺服器',
-    closed: '房間已關閉'
-  };
+  function connText(kind) { return tr('conn.' + kind); }
 
-  function nickOrDefault() { return nick || '路過的觀眾'; }
+  function nickOrDefault() { return nick || tr('nick.default'); }
 
   /* ---------- 大廳 ---------- */
-  function setLobbyState(kind, text) {
+  var lobbyMsg = null;   // 以 key 設定的狀態列文字，切換語言時重畫
+  function setLobbyState(kind, text, key, params) {
     var el = q('lobby-state');
     if (!el) return;
-    el.textContent = text;
+    lobbyMsg = key ? { kind: kind, key: key, params: params } : null;
+    el.textContent = key ? tr(key, params) : text;
     el.setAttribute('data-state', kind);
   }
+  function setLobbyKey(kind, key, params) { setLobbyState(kind, '', key, params); }
 
   function renderLobby() {
     var on = w.Online.isEnabled();
@@ -783,7 +737,7 @@
 
   function refreshLobby(quiet) {
     if (!w.Online.isEnabled()) return;
-    if (!quiet) setLobbyState('loading', '正在讀取房間列表…');
+    if (!quiet) setLobbyKey('loading', 'lobby.loading');
     w.Online.listRooms(function (err, data) {
       if (cur !== 's-lobby') return;
       if (err) {
@@ -792,27 +746,29 @@
         return;
       }
       renderRooms(data.rooms);
-      setLobbyState('ok', '目前有 ' + data.rooms.length + ' 間房間（伺服器上限 ' + data.maxRooms + ' 間）。');
+      setLobbyKey('ok', 'lobby.count', { n: data.rooms.length, max: data.maxRooms });
     }, function () {
-      if (cur === 's-lobby') setLobbyState('waking', '伺服器好像在睡覺，正在喚醒…免費方案冷啟動大約要十幾秒，請稍等。');
+      if (cur === 's-lobby') setLobbyKey('waking', 'lobby.waking');
     });
   }
 
   /* 房間卡片一律用 textContent 塞入使用者資料（暱稱由別人輸入，絕不能碰 innerHTML） */
+  var lastRooms;
   function renderRooms(rooms) {
+    lastRooms = rooms;
     var host2 = q('roomlist');
     host2.innerHTML = '';
     if (rooms === null) {
       var fail = D.createElement('div');
       fail.className = 'rooms-empty';
-      fail.textContent = '暫時拿不到房間列表。可以按上面的「重新整理」再試一次，或直接輸入房號加入。';
+      fail.textContent = tr('lobby.failList');
       host2.appendChild(fail);
       return;
     }
     if (!rooms.length) {
       var empty = D.createElement('div');
       empty.className = 'rooms-empty';
-      empty.textContent = '現在沒有人開房。你可以按「開一間房來解題」，讓別人進來看你解題兼聊天。';
+      empty.textContent = tr('lobby.noRooms');
       host2.appendChild(empty);
       return;
     }
@@ -835,7 +791,7 @@
     main.className = 'rc-main';
     var who = D.createElement('span');
     who.className = 'rc-host';
-    who.textContent = room.hostName;
+    who.textContent = displayName(room.hostName);
     var meta = D.createElement('span');
     meta.className = 'rc-meta';
 
@@ -845,20 +801,21 @@
       t.textContent = text;
       meta.appendChild(t);
     }
-    tag(room.label || room.difficulty || '難度未知');
-    tag(room.status === 'done' ? '已完成' : '進行中', room.status === 'done' ? 'done' : 'live');
-    if (!room.hostOnline) tag('主持人離線中', 'off');
+    var roomDiff = S.PRESETS[room.difficulty] ? diffLabel(room.difficulty) : (room.label || room.difficulty || tr('room.diffUnknown'));
+    tag(roomDiff);
+    tag(room.status === 'done' ? tr('room.done') : tr('room.live'), room.status === 'done' ? 'done' : 'live');
+    if (!room.hostOnline) tag(tr('room.hostOffline'), 'off');
     tag('👀 ' + room.viewers + ' / ' + room.maxViewers);
-    tag('已填 ' + room.filled + ' / ' + room.total);
+    tag(tr('room.filled', { a: room.filled, b: room.total }));
     tag('⏱ ' + fmtTime(room.elapsedMs));
-    tag('開房 ' + agoText(room.createdAt));
+    tag(tr('room.opened', { ago: agoText(room.createdAt) }));
 
     main.appendChild(who);
     main.appendChild(meta);
 
     var go2 = D.createElement('span');
     go2.className = 'rc-go';
-    go2.textContent = room.viewers >= room.maxViewers ? '已滿' : '進去看 ▶';
+    go2.textContent = room.viewers >= room.maxViewers ? tr('room.full') : tr('room.enter');
 
     var bar = D.createElement('span');
     bar.className = 'rc-bar';
@@ -870,10 +827,11 @@
     card.appendChild(main);
     card.appendChild(go2);
     card.appendChild(bar);
-    card.setAttribute('aria-label',
-      '房號 ' + room.code + '，主持人 ' + room.hostName + '，' + (room.label || '') +
-      '，' + (room.status === 'done' ? '已完成' : '進行中') +
-      '，已填 ' + room.filled + ' 格，共 ' + room.viewers + ' 人觀戰');
+    card.setAttribute('aria-label', tr('room.cardAria', {
+      code: room.code, host: displayName(room.hostName), diff: roomDiff,
+      status: room.status === 'done' ? tr('room.done') : tr('room.live'),
+      filled: room.filled, viewers: room.viewers
+    }));
     card.addEventListener('click', function () {
       w.Sound.play('click');
       joinRoom(room.code, '');
@@ -883,17 +841,27 @@
 
   function agoText(at) {
     var sec = Math.max(0, Math.round((Date.now() - at) / 1000));
-    if (sec < 60) return sec + ' 秒前';
-    if (sec < 3600) return Math.round(sec / 60) + ' 分鐘前';
-    return Math.round(sec / 3600) + ' 小時前';
+    if (sec < 60) return tr('ago.s', { n: sec });
+    if (sec < 3600) return tr('ago.m', { n: Math.round(sec / 60) });
+    return tr('ago.h', { n: Math.round(sec / 3600) });
   }
 
   /* ---------- 開房（主持人） ---------- */
-  function setHostConn(kind, text) {
+  var hostConn = { kind: '', key: '', detail: '' };
+  function setHostConn(kind, key, detail) {
+    hostConn = { kind: kind, key: key || '', detail: detail || '' };
+    renderHostConn();
+  }
+  function renderHostConn() {
     var el = q('h-conn');
-    if (!el) return;
-    el.textContent = text || CONN_TEXT[kind] || kind;
-    el.setAttribute('data-state', kind);
+    if (!el || !hostConn.kind) return;
+    var text = tr(hostConn.key || ('conn.' + hostConn.kind));
+    if (hostConn.detail && hostConn.kind === 'retrying') text = tr('conn.withDetail', { t: text, d: hostConn.detail });
+    el.textContent = text;
+    el.setAttribute('data-state', hostConn.kind);
+  }
+  function renderHostViewers(n) {
+    q('h-viewers').textContent = tr('room.viewers', { n: n });
   }
 
   function hostSnapshot() {
@@ -930,7 +898,7 @@
     if (!state) return;
     if (!w.Online.isEnabled()) {
       hostMode = false;
-      toast('目前是單機模式，沒辦法開房。');
+      toast(tr('toast.noHost'));
       say(w.Online.disabledReason(), 'bad');
       return;
     }
@@ -939,9 +907,9 @@
     q('b-room-info').setAttribute('aria-expanded', 'false');
     setTimeout(function () { w.UI.paint(q('b-room-info')); }, 0);
     q('hostbar').hidden = false;
-    q('h-code').textContent = '開房中…';
-    q('h-viewers').textContent = '👀 0 人觀戰';
-    setHostConn('connecting', '開房中…');
+    q('h-code').textContent = tr('conn.opening');
+    renderHostViewers(0);
+    setHostConn('connecting', 'conn.opening');
     setChatEnabled(false);
 
     w.Online.createRoom({
@@ -960,8 +928,8 @@
         q('b-room-info').setAttribute('aria-expanded', 'false');
         q('hostbar').hidden = true;
         setChatVisible(false);
-        say('開房失敗：' + err.message, 'bad');
-        toast('開房失敗');
+        say(tr('room.openFail', { msg: err.message }), 'bad');
+        toast(tr('toast.openFail'));
         return;
       }
       host = {
@@ -970,10 +938,10 @@
       };
       if (w.NetworkLatency) w.NetworkLatency.setActive(cur === 's-game' && !!state && state.status === 'playing');
       q('h-code').textContent = host.code;
-      resetChat('房號 ' + host.code + '（你是主持人）');
+      resetChat('chat.roomHost', { code: host.code });
       setChatVisible(true);
       w.Sound.play('join');
-      say('房間開好了！房號 ' + host.code + '，按「分享連結」把它傳給朋友，他們就能進來看你解題。', 'good');
+      sayKey('room.openOk', { code: host.code }, 'good');
 
       w.Online.connect({
         code: host.code,
@@ -982,24 +950,24 @@
           state: onHostState,
           note: onSharedNote,
           status: function (st, detail) {
-            setHostConn(st, CONN_TEXT[st] + (detail && st === 'retrying' ? '（' + detail + '）' : ''));
+            setHostConn(st, '', detail);
             setChatEnabled(st === 'open');
           },
           presence: function (p) {
             if (!host) return;
             var before = host.viewers;
             host.viewers = p.viewers;
-            q('h-viewers').textContent = '👀 ' + p.viewers + ' 人觀戰';
+            renderHostViewers(p.viewers);
             if (p.viewers > before) {
-              systemChat('有人進來觀戰了，目前 ' + p.viewers + ' 人。');
+              systemChat(tr('chat.sysJoin', { n: p.viewers }));
               w.Sound.playChat();
             } else if (p.viewers < before) {
-              systemChat('有人離開了，目前 ' + p.viewers + ' 人。');
+              systemChat(tr('chat.sysLeave', { n: p.viewers }));
             }
           },
           chat: onChatMessage,
           closed: function () {
-            systemChat('房間已經關閉。');
+            systemChat(tr('chat.sysClosed'));
             endHostRoom(false);
           }
         }
@@ -1007,7 +975,7 @@
       w.Online.startStatePush(hostSnapshot);
       pushHostState();
     }, function () {
-      setHostConn('waking', CONN_TEXT.waking);
+      setHostConn('waking');
     });
   }
 
@@ -1027,7 +995,7 @@
     setChatOpen(false);
     if (announce) {
       w.Online.closeRoom(function () {});
-      toast('房間 ' + code + ' 已關閉');
+      toast(tr('toast.roomClosed', { code: code }));
     } else {
       w.Online.disconnect();
     }
@@ -1048,10 +1016,10 @@
   function doShare() {
     if (!host) return;
     var url = shareUrl();
-    var text = '來看我解數獨！房號 ' + host.code;
+    var text = tr('share.text', { code: host.code });
     if (w.navigator && typeof w.navigator.share === 'function') {
-      w.navigator.share({ title: '數獨小學堂 觀戰', text: text, url: url })
-        .then(function () { say('連結已經分享出去了。', 'good'); })
+      w.navigator.share({ title: tr('share.title'), text: text, url: url })
+        .then(function () { say(tr('share.done'), 'good'); })
         .catch(function () { copyShare(url); });
       return;
     }
@@ -1061,14 +1029,14 @@
   function copyShare(url) {
     if (w.navigator && w.navigator.clipboard && typeof w.navigator.clipboard.writeText === 'function') {
       w.navigator.clipboard.writeText(url).then(function () {
-        toast('連結已複製');
-        say('觀戰連結已複製到剪貼簿：' + url, 'good');
+        toast(tr('toast.linkCopied'));
+        say(tr('share.copied', { url: url }), 'good');
       }).catch(function () {
-        say('複製失敗，請手動複製這個連結：' + url, 'warn');
+        say(tr('share.copyFail', { url: url }), 'warn');
       });
       return;
     }
-    say('請手動複製這個觀戰連結：' + url, 'warn');
+    say(tr('share.manual', { url: url }), 'warn');
   }
 
   function copyRoomCode() {
@@ -1076,23 +1044,23 @@
     var code = host.code;
     if (w.navigator && w.navigator.clipboard && typeof w.navigator.clipboard.writeText === 'function') {
       w.navigator.clipboard.writeText(code).then(function () {
-        toast('房號已複製');
-        say('房號 ' + code + ' 已複製，可以貼給朋友。', 'good');
+        toast(tr('toast.codeCopied'));
+        say(tr('code.copied', { code: code }), 'good');
       }).catch(function () {
-        say('複製失敗，房號是 ' + code + '，請手動輸入給朋友。', 'warn');
+        say(tr('code.copyFail', { code: code }), 'warn');
       });
       return;
     }
-    say('房號是 ' + code + '，請手動輸入給朋友。', 'warn');
+    say(tr('code.manual', { code: code }), 'warn');
   }
 
   function doReinvite() {
     if (!host) return;
     w.Online.rotateInvite(function (err, data) {
-      if (err) { say('換連結失敗：' + err.message, 'bad'); return; }
+      if (err) { say(tr('room.reinviteFail', { msg: err.message }), 'bad'); return; }
       host.invite = data.inviteToken;
-      toast('舊連結已失效');
-      say('已經產生新的觀戰連結，之前發出去的連結立刻失效（用房號 ' + host.code + ' 還是進得來）。', 'good');
+      toast(tr('toast.oldLink'));
+      say(tr('room.reinviteOk', { code: host.code }), 'good');
     });
   }
 
@@ -1172,14 +1140,16 @@
     corner.classList.toggle('has-notes', list.length > 0);
     count.textContent = list.length ? String(list.length) : '';
     corner.setAttribute('aria-label', list.length
-      ? '查看這格的 ' + list.length + ' 則格子留言'
-      : '查看這格的格子留言，目前沒有內容');
+      ? tr('cell.noteViewN', { n: list.length })
+      : tr('cell.noteViewNone'));
+    var popTitle = popover.querySelector('.cell-note-popover-title');
+    if (popTitle) popTitle.textContent = tr('cell.noteTitle');
     popover.hidden = !open;
     while (items.firstChild) items.removeChild(items.firstChild);
     if (!list.length) {
       var empty = D.createElement('span');
       empty.className = 'cell-note-empty';
-      empty.textContent = '目前沒有格子留言';
+      empty.textContent = tr('cell.noteNone');
       items.appendChild(empty);
       return;
     }
@@ -1187,7 +1157,7 @@
       var row = D.createElement('span');
       row.className = 'cell-note-item';
       var who = D.createElement('b');
-      who.textContent = (note.role === 'host' ? '主持人：' : '') + note.name;
+      who.textContent = (note.role === 'host' ? tr('cell.hostPrefix') : '') + displayName(note.name);
       var text = D.createElement('span');
       text.textContent = note.text;
       row.appendChild(who);
@@ -1207,9 +1177,9 @@
     var listEl = q('watch-note-list');
     if (!label || !input || !listEl) return;
     if (!watch || !watch.view || watch.selected < 0) {
-      label.textContent = '尚未選格';
+      label.textContent = tr('watch.noCell');
       if (D.activeElement !== input) input.value = '';
-      listEl.textContent = '先點盤面上的格子。';
+      listEl.textContent = tr('watch.pickCell');
       return;
     }
 
@@ -1223,7 +1193,7 @@
     if (!list.length) {
       var empty = D.createElement('p');
       empty.className = 'watch-note-empty';
-      empty.textContent = '這格目前還沒有格子留言。';
+      empty.textContent = tr('watch.noteEmpty');
       listEl.appendChild(empty);
       return;
     }
@@ -1231,8 +1201,8 @@
       var row = D.createElement('div');
       row.className = 'watch-note-item' + (note.authorId === noteAuthorId() ? ' mine' : '');
       var who = D.createElement('b');
-      who.textContent = note.name + (note.authorId === noteAuthorId() ? '（你）' : '') +
-        (note.role === 'host' ? '（主持人）' : '');
+      who.textContent = displayName(note.name) + (note.authorId === noteAuthorId() ? tr('tag.you') : '') +
+        (note.role === 'host' ? tr('tag.host') : '');
       var text = D.createElement('span');
       text.textContent = note.text;
       row.appendChild(who);
@@ -1272,9 +1242,9 @@
       }
       renderCellNotes(el, watch, i, watchNoteOpenIndex === i);
       var shared = notesFor(watch, i);
-      el.setAttribute('aria-label', '第 ' + (S.ROW_OF[i] + 1) + ' 列第 ' + (S.COL_OF[i] + 1) + ' 行，' +
-        (v ? (view.given[i] ? '題目給的 ' : '') + v : '空格') +
-        (shared.length ? '，有 ' + shared.length + ' 則格子留言' : '，可查看或填寫格子留言'));
+      el.setAttribute('aria-label', tr('cell.pos', { r: S.ROW_OF[i] + 1, c: S.COL_OF[i] + 1 }) + tr('sep.comma') +
+        (v ? (view.given[i] ? tr('cell.givenPrefix') : '') + v : tr('cell.empty')) + tr('sep.comma') +
+        (shared.length ? tr('cell.shared', { n: shared.length }) : tr('cell.sharedCanWrite')));
     }
     renderWatchNotePanel();
   }
@@ -1304,8 +1274,8 @@
   function joinRoom(code, invite) {
     code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
     if (code.length !== 4) {
-      toast('房號要 4 個英數字');
-      setLobbyState('error', '房號格式不對：要 4 個英數字，例如 K7Q2。');
+      toast(tr('toast.codeFormat'));
+      setLobbyKey('error', 'lobby.badCode');
       return;
     }
     if (!w.Online.isEnabled()) {
@@ -1320,19 +1290,13 @@
     };
     watchNoteOpenIndex = -1;
     lastWatchValues = '';
-    q('w-code').textContent = '房號 ' + code;
-    q('w-host').textContent = '主持人 —';
-    q('w-diff').textContent = '—';
-    q('sum-host').textContent = '—';
-    q('sum-diff').textContent = '—';
-    q('sum-seed').textContent = '—';
-    q('sum-progress').textContent = '—';
-    q('sum-activity').textContent = '等待第一筆盤面…';
+    watchAct = { key: 'act.wait' };
     hideWatchOverlay();
-    resetChat('房號 ' + code);
+    resetChat('chat.room', { code: code });
     setChatVisible(true);
     setChatEnabled(false);
-    setWatchFeedback('正在連線到房間 ' + code + '…', '');
+    setWatchFeedbackKey('watch.connectingTo', { code: code }, '');
+    renderWatchMeta();
     go('s-watch');
 
     w.Online.connect({
@@ -1348,17 +1312,17 @@
           if (!watch) return;
           watch.viewers = p.viewers;
           q('w-viewers').textContent = String(p.viewers);
-          q('w-host').textContent = '主持人 ' + p.hostName;
-          q('sum-host').textContent = p.hostName + (p.hostOnline ? '' : '（離線中）');
+          watch.presence = { hostName: p.hostName, hostOnline: p.hostOnline };
+          renderWatchMeta();
         },
         closed: function (data) {
           var why = data && data.reason;
           showWatchOverlay('closed',
-            why === 'idle' ? '房間閒置太久被回收了。'
-              : why === 'hostgone' ? '主持人離線超過寬限期，房間已經關閉。'
-                : why === 'shutdown' ? '伺服器正在重新啟動，房間都被關掉了。'
-                  : why === 'gone' ? '這個房間已經不存在了。'
-                    : '主持人結束了這個房間。');
+            why === 'idle' ? 'watch.why.idle'
+              : why === 'hostgone' ? 'watch.why.hostgone'
+                : why === 'shutdown' ? 'watch.why.shutdown'
+                  : why === 'gone' ? 'watch.why.gone'
+                    : 'watch.why.ended');
         }
       }
     });
@@ -1368,7 +1332,7 @@
     if (!pendingInvite) return;
     var value = w.Store.normalizeNick(q('lobby-nick').value);
     if (!value) {
-      toast('請先輸入暱稱，再加入邀請房間');
+      toast(tr('toast.needNick'));
       q('lobby-nick').focus();
       return;
     }
@@ -1382,18 +1346,19 @@
 
   function onWatchStatus(st, detail) {
     setChatConn(st, detail);
-    q('sum-conn').textContent = CONN_TEXT[st] || st;
+    watchConn = st;
+    q('sum-conn').textContent = connText(st);
     var live = q('w-live');
     if (live) live.setAttribute('data-state', st === 'open' ? '' : st);
     setChatEnabled(st === 'open');
     setWatchNoteEnabled(st === 'open');
     if (st === 'failed') {
-      showWatchOverlay('failed', detail || '連不上伺服器。可能是網路斷了，或伺服器正在休眠。');
+      showWatchOverlay('failed', detail ? '' : 'watch.failedNote', detail || '');
     } else if (st === 'open') {
       hideWatchOverlay();
-      setWatchFeedback('觀戰中：主持人的盤面唯讀；你可以點格子填格子留言，大家都看得到。', 'good');
+      setWatchFeedbackKey('watch.openFb', null, 'good');
     } else if (st === 'retrying' || st === 'waking' || st === 'connecting') {
-      setWatchFeedback(CONN_TEXT[st], 'warn');
+      setWatchFeedbackKey('conn.' + st, null, 'warn');
     }
   }
 
@@ -1404,35 +1369,55 @@
     if (w.NetworkLatency) w.NetworkLatency.setActive(cur === 's-watch' && view.status === 'playing');
     var prev = lastWatchValues;
     watch.meta = data;
+    if (watch.presence) watch.presence.hostOnline = data.hostOnline;
     watch.view = view;
     watch.cellNotes = normalizeCellNotes(data.cellNotes);
     if (!watchCells.length) buildWatchBoard();
     renderWatchBoard();
     resizeWatchBoard();
 
-    q('w-host').textContent = '主持人 ' + data.hostName;
-    q('w-diff').textContent = data.label || data.difficulty || '—';
-    q('w-code').textContent = '房號 ' + data.code;
     q('w-left').textContent = String(view.remaining);
     q('w-hint').textContent = String(view.hintsUsed);
     q('w-miss').textContent = String(view.mistakes);
     q('w-viewers').textContent = String(data.viewers);
 
-    q('sum-host').textContent = data.hostName + (data.hostOnline ? '' : '（離線中）');
-    q('sum-diff').textContent = (data.label || data.difficulty || '—') + (data.technique ? '（' + data.technique + '）' : '');
-    q('sum-seed').textContent = data.seed || '—';
-    q('sum-progress').textContent = '已填 ' + view.filled + ' / ' + view.total + ' 格，還剩 ' + view.remaining + ' 格';
-    q('sum-role').textContent = view.status === 'won' ? '觀戰中（這局已完成）' : '觀戰中（盤面唯讀）';
-
     var values = G.gridToString(view.values);
-    q('sum-activity').textContent = describeChange(prev, values, view);
+    watchAct = describeChange(prev, values, view);
     lastWatchValues = values;
+    renderWatchMeta();
 
     startWatchClock(view);
     if (view.status === 'won') {
-      setWatchFeedback('主持人完成了這一題！用了 ' + fmtTime(view.elapsedMs) + '，提示 ' + view.hintsUsed + ' 次。', 'good');
+      setWatchFeedbackKey('watch.wonFb', { time: fmtTime(view.elapsedMs), n: view.hintsUsed }, 'good');
       stopWatchClock();
     }
+  }
+
+  var watchAct = { key: 'act.wait' };
+  var watchConn = 'connecting';
+  /* 觀戰畫面所有「由資料組出來的文字」集中在這裡：收到新盤面、切換語言都用同一份資料重畫 */
+  function renderWatchMeta() {
+    var data = watch && watch.meta;
+    var view = watch && watch.view;
+    var pres = watch && watch.presence;
+    var hostName = (pres && pres.hostName) || (data && data.hostName) || '';
+    var hostOnline = pres ? pres.hostOnline : (data ? data.hostOnline : true);
+    q('w-code').textContent = watch ? tr('watch.code', { code: (data && data.code) || watch.code }) : tr('watch.codeNone');
+    q('w-host').textContent = hostName ? tr('watch.host', { name: displayName(hostName) }) : tr('watch.hostNone');
+    var diffText = '—';
+    if (data) diffText = S.PRESETS[data.difficulty] ? diffLabel(data.difficulty) : (data.label || data.difficulty || '—');
+    q('w-diff').textContent = diffText;
+    q('sum-host').textContent = hostName ? displayName(hostName) + (hostOnline ? '' : tr('watch.offline')) : '—';
+    q('sum-diff').textContent = data
+      ? diffText + (data.technique ? tr('watch.techWrap', { t: techName(data.technique) }) : '')
+      : '—';
+    q('sum-seed').textContent = (data && data.seed) || '—';
+    q('sum-progress').textContent = view
+      ? tr('watch.progress', { filled: view.filled, total: view.total, left: view.remaining })
+      : '—';
+    q('sum-role').textContent = view && view.status === 'won' ? tr('watch.roleWon') : tr('watch.role');
+    q('sum-activity').textContent = tr(watchAct.key, watchAct.params);
+    q('sum-conn').textContent = connText(watchConn);
   }
 
   function setWatchNoteEnabled(on) {
@@ -1445,52 +1430,52 @@
 
   function submitWatchNote() {
     if (!watch || !watch.view || watch.selected < 0) {
-      setWatchFeedback('請先點一格，再輸入格子留言。', 'warn');
+      setWatchFeedbackKey('watch.fbPick', null, 'warn');
       return;
     }
     var input = q('watch-note-input');
     var text = input.value;
     if (text.length > 10) {
-      setWatchFeedback('每則格子留言最多 10 個字。', 'bad');
+      setWatchFeedbackKey('watch.fbLong', null, 'bad');
       return;
     }
     if (!text.trim()) {
-      setWatchFeedback('請輸入留言內容；每次送出都會新增一則。', 'warn');
+      setWatchFeedbackKey('watch.fbEmpty', null, 'warn');
       return;
     }
     setWatchNoteEnabled(false);
-    setWatchFeedback('格子留言送出中…', '');
+    setWatchFeedbackKey('watch.fbSending', null, '');
     w.Online.sendNote(watch.selected, text, nickOrDefault(), function (err) {
       var open = w.Online.connState() === 'open';
       setWatchNoteEnabled(open);
       if (err) {
-        setWatchFeedback('格子留言沒有送出去：' + err.message, 'bad');
+        setWatchFeedback(tr('watch.fbFail', { msg: err.message }), 'bad');
         w.Sound.play('blocked');
         return;
       }
       input.value = '';
       renderWatchNotePanel();
-      setWatchFeedback('格子留言已新增，玩家和其他觀戰者都看得到。', 'good');
+      setWatchFeedbackKey('watch.fbOk', null, 'good');
       w.Sound.play('note');
     });
   }
 
   /* 比對前後兩份盤面，用一句話說明主持人剛剛做了什麼 */
   function describeChange(before, after, view) {
-    if (view.status === 'won') return '已經完成整題！';
-    if (view.paused) return '主持人暫停了，盤面先停在這裡。';
+    if (view.status === 'won') return { key: 'act.won' };
+    if (view.paused) return { key: 'act.paused' };
     if (!before || before === after) {
-      return view.selected >= 0 ? ('正在看 ' + S.cellName(view.selected) + '。') : '正在思考…';
+      return view.selected >= 0 ? { key: 'act.looking', params: { cell: S.cellName(view.selected) } } : { key: 'act.thinking' };
     }
     for (var i = 0; i < 81; i++) {
       if (before.charAt(i) !== after.charAt(i)) {
         var now = after.charAt(i);
         return now === '0'
-          ? ('把 ' + S.cellName(i) + ' 清掉了。')
-          : ('在 ' + S.cellName(i) + ' 填了 ' + now + '。');
+          ? { key: 'act.cleared', params: { cell: S.cellName(i) } }
+          : { key: 'act.filled', params: { cell: S.cellName(i), d: now } };
       }
     }
-    return '調整了筆記。';
+    return { key: 'act.notes' };
   }
 
   function startWatchClock(view) {
@@ -1507,19 +1492,25 @@
     if (watchTimer) { clearInterval(watchTimer); watchTimer = null; }
   }
 
+  var watchFb = null;
   function setWatchFeedback(text, kind) {
     var el = q('w-feedback');
+    watchFb = null;
     if (!el) return;
     el.textContent = text;
     el.className = 'feedback' + (kind ? ' ' + kind : '');
   }
+  function setWatchFeedbackKey(key, params, kind) {
+    setWatchFeedback(tr(key, params), kind);
+    watchFb = { key: key, params: params, kind: kind };
+  }
 
-  function showWatchOverlay(kind, note) {
+  var watchOv = null;
+  function showWatchOverlay(kind, noteKey, rawNote) {
     var ov = q('watch-overlay');
     stopWatchClock();
-    q('watch-ov-face').textContent = kind === 'failed' ? '📡' : '📴';
-    q('watch-ov-title').textContent = kind === 'failed' ? '連不上房間' : '房間已關閉';
-    q('watch-ov-note').textContent = note || '';
+    watchOv = { kind: kind, key: noteKey, raw: rawNote };
+    renderWatchOverlay();
     q('b-watch-retry').hidden = false;
     ov.classList.add('on');
     ov.setAttribute('aria-hidden', 'false');
@@ -1527,10 +1518,17 @@
     setTimeout(function () { var b = q('watch-ov-box'); if (b) b.focus(); }, 20);
     w.Sound.play('leave');
   }
+  function renderWatchOverlay() {
+    if (!watchOv) return;
+    q('watch-ov-face').textContent = watchOv.kind === 'failed' ? '📡' : '📴';
+    q('watch-ov-title').textContent = watchOv.kind === 'failed' ? tr('watch.failedTitle') : tr('watch.closedTitle');
+    q('watch-ov-note').textContent = watchOv.key ? tr(watchOv.key) : (watchOv.raw || '');
+  }
   function hideWatchOverlay() {
     var ov = q('watch-overlay');
     ov.classList.remove('on');
     ov.setAttribute('aria-hidden', 'true');
+    watchOv = null;
   }
 
   function leaveWatch(goLobby) {
@@ -1593,35 +1591,55 @@
     badge.hidden = chatUnread <= 0;
     badge.textContent = chatUnread > 99 ? '99+' : String(chatUnread);
     q('b-chat').setAttribute('aria-label', chatUnread > 0
-      ? ('開啟房間留言板，有 ' + chatUnread + ' 則新訊息')
-      : '開啟房間留言板');
+      ? tr('chat.openAriaN', { n: chatUnread })
+      : tr('chat.openAria'));
   }
 
-  function resetChat(roomLabel) {
+  var chatRoom = null;
+  function resetChat(roomKey, roomParams) {
     chatSeen = {};
     chatUnread = 0;
     updateChatBadge();
-    q('chat-room').textContent = roomLabel || '';
+    chatRoom = roomKey ? { key: roomKey, params: roomParams } : null;
+    renderChatRoom();
     var log = q('chat-log');
     log.innerHTML = '';
     var hint = D.createElement('p');
     hint.className = 'chat-empty';
-    hint.textContent = '這裡是房間留言板，房間關掉之後訊息就不會保留。禮貌一點，大家都看得到。';
+    hint.textContent = tr('chat.empty');
     log.appendChild(hint);
-    setChatNote('最多 120 字，送太快會被伺服器擋下來。', false);
+    setChatNoteKey('chat.limit', false);
+  }
+  function renderChatRoom() {
+    q('chat-room').textContent = chatRoom ? tr(chatRoom.key, chatRoom.params) : '';
   }
 
+  var chatConnState = null;
   function setChatConn(kind, detail) {
     var el = q('chat-conn');
     if (!el) return;
+    chatConnState = { kind: kind, detail: detail };
+    renderChatConn();
+  }
+  function renderChatConn() {
+    var el = q('chat-conn');
+    if (!el || !chatConnState) return;
+    var kind = chatConnState.kind, detail = chatConnState.detail;
     el.setAttribute('data-state', kind);
-    el.textContent = (CONN_TEXT[kind] || kind) + (detail && kind === 'retrying' ? '（' + detail + '）' : '');
+    var text = connText(kind);
+    el.textContent = detail && kind === 'retrying' ? tr('conn.withDetail', { t: text, d: detail }) : text;
   }
 
+  var chatNoteKey = null;
   function setChatNote(text, bad) {
     var el = q('chat-note');
+    chatNoteKey = null;
     el.textContent = text;
     el.className = 'chat-note' + (bad ? ' bad' : '');
+  }
+  function setChatNoteKey(key, bad) {
+    setChatNote(tr(key), bad);
+    chatNoteKey = { key: key, bad: bad };
   }
 
   function setChatEnabled(on) {
@@ -1662,7 +1680,7 @@
     var who = D.createElement('span');
     who.className = 'who';
     /* 使用者輸入一律 textContent，絕不用 innerHTML */
-    who.textContent = msg.name + (msg.role === 'host' ? '（主持人）' : '');
+    who.textContent = displayName(msg.name) + (msg.role === 'host' ? tr('tag.host') : '');
     var tx = D.createElement('span');
     tx.className = 'tx';
     tx.textContent = msg.text;
@@ -1682,19 +1700,19 @@
   function submitChat() {
     var input = q('chat-input');
     var text = input.value.trim();
-    if (!text) { setChatNote('先寫點東西再送出。', true); return; }
+    if (!text) { setChatNoteKey('chat.writeFirst', true); return; }
     setChatEnabled(false);
-    setChatNote('送出中…', false);
+    setChatNoteKey('chat.sending', false);
     w.Online.sendChat(text, nickOrDefault(), function (err) {
       var open = w.Online.connState() === 'open';
       setChatEnabled(open);
       if (err) {
-        setChatNote('沒送出去：' + err.message, true);
+        setChatNote(tr('chat.fail', { msg: err.message }), true);
         w.Sound.play('blocked');
         return;
       }
       input.value = '';
-      setChatNote('最多 120 字，送太快會被伺服器擋下來。', false);
+      setChatNoteKey('chat.limit', false);
       if (open) input.focus();
     });
   }
@@ -1714,9 +1732,7 @@
     pendingInvite = { code: String(m[1] || '').toUpperCase(), token: invite };
     q('lobby-code').value = pendingInvite.code;
     q('lobby-invite').hidden = false;
-    q('lobby-invite-note').textContent = invite
-      ? '請先設定你的暱稱，再加入這間受邀的觀戰房間。'
-      : '請先設定你的暱稱，再加入這間觀戰房間。';
+    q('lobby-invite-note').textContent = invite ? tr('lobby.inviteNoteToken') : tr('lobby.inviteNote');
     if (!w.Online.isEnabled()) {
       go('s-lobby');
       renderLobby();
@@ -1724,7 +1740,7 @@
     }
     go('s-lobby');
     renderLobby();
-    setLobbyState('ok', '邀請連結已準備好，確認暱稱後就能加入。');
+    setLobbyKey('ok', 'lobby.inviteReady');
     try { q('lobby-nick').focus(); } catch (e) {}
     return true;
   }
@@ -1775,7 +1791,7 @@
     q('b-close-room').addEventListener('click', function () {
       w.Sound.play('click');
       endHostRoom(true);
-      say('觀戰房間已經關閉，你可以繼續自己解這一題。', 'good');
+      sayKey('room.closedSay', null, 'good');
     });
 
     q('b-watch-leave').addEventListener('click', function () { w.Sound.play('click'); leaveWatch(true); });
@@ -1794,7 +1810,7 @@
       var box = q('w-summary');
       var open = box.classList.toggle('collapsed');
       q('b-sum-toggle').setAttribute('aria-expanded', open ? 'false' : 'true');
-      q('b-sum-toggle').textContent = open ? '展開' : '收合';
+      q('b-sum-toggle').textContent = open ? tr('watch.expand') : tr('watch.collapse');
       w.Sound.play('click');
       setTimeout(resizeWatchBoard, 30);
     });
@@ -1814,19 +1830,15 @@
   /* ---------- 設定彈窗 ---------- */
   /* 連線狀態：server URL 只從 GameConfig 拿，這裡不自己拼網址。
    * 單機模式（沒設定）不會發出任何請求，畫面直接顯示「單機」。 */
-  var SERVER_STATE_TEXT = {
-    unset: { pill: '單機', note: '這是單機遊戲，沒有伺服器也能完整遊玩；成績與進度都存在這台裝置上。' },
-    invalid: { pill: '設定錯誤', note: '伺服器網址格式不正確，已自動改用單機模式。請檢查部署時注入的 GAME_SERVER_URL。' },
-    checking: { pill: '連線中', note: '正在確認伺服器狀態…免費雲端服務剛醒來時可能要等十幾秒。' },
-    ok: { pill: '已連線', note: '伺服器回應正常。' },
-    fail: { pill: '連不上', note: '目前連不上伺服器，遊戲會以單機模式繼續，不影響這一局。' }
-  };
+  var SERVER_STATES = { unset: 1, invalid: 1, checking: 1, ok: 1, fail: 1 };
+  var serverStateNow = 'unset';
   function setServerState(state) {
     var pill = q('settings-server-state');
     var note = q('settings-server-note');
-    var info = SERVER_STATE_TEXT[state] || SERVER_STATE_TEXT.unset;
-    if (pill) { pill.textContent = info.pill; pill.setAttribute('data-state', state); }
-    if (note) note.textContent = info.note;
+    if (!SERVER_STATES[state]) state = 'unset';
+    serverStateNow = state;
+    if (pill) { pill.textContent = tr('server.' + state + '.pill'); pill.setAttribute('data-state', state); }
+    if (note) note.textContent = tr('server.' + state + '.note');
   }
   function syncServerRow() {
     var C = w.GameConfig;
@@ -1847,8 +1859,8 @@
     q('settings-sfx-volume').value = sv;
     q('settings-music-volume-value').textContent = mv + '%';
     q('settings-sfx-volume-value').textContent = sv + '%';
-    q('settings-music-status').textContent = musicOn ? '開啟' : '關閉';
-    q('settings-sfx-status').textContent = sfxOn ? '開啟' : '關閉';
+    q('settings-music-status').textContent = musicOn ? tr('common.on') : tr('common.off');
+    q('settings-sfx-status').textContent = sfxOn ? tr('common.on') : tr('common.off');
     q('settings-haptic').checked = w.Sound.isHapticOn();
     q('settings-chatcue').checked = w.Sound.isChatCueOn();
     q('settings-nick').value = nick;
@@ -1859,8 +1871,8 @@
     q('settings-units').checked = options.highlightUnits;
     q('settings-remaining').checked = options.showRemaining;
     q('settings-audio-note').textContent = w.Sound.isUnlocked()
-      ? '聲音已經可以播放了。'
-      : '聲音會在你第一次點畫面之後才開始播放，這是瀏覽器的規定。';
+      ? tr('settings.audioReady')
+      : tr('settings.audioLocked');
     syncServerRow();
   }
 
@@ -2011,7 +2023,7 @@
       w.Store.saveOptions(options);
       applyOptions();
       syncSettings();
-      toast('已恢復預設設定');
+      toast(tr('toast.resetDone'));
       w.Sound.play('click');
     });
 
@@ -2089,7 +2101,7 @@
       setPaused(false);
       renderBoard();
       saveNow();
-      say('已回到題目一開始的樣子。', 'good');
+      sayKey('msg.restartedSay', null, 'good');
     });
     q('b-pausequit').addEventListener('click', function () {
       w.Sound.play('click');
@@ -2120,7 +2132,7 @@
       w.Sound.play('click');
       w.Store.clearBest();
       renderStats();
-      toast('已清除本機紀錄');
+      toast(tr('toast.statsCleared'));
     });
 
     q('b-tut-prev').addEventListener('click', function () {
@@ -2130,7 +2142,7 @@
     });
     q('b-tut-next').addEventListener('click', function () {
       w.Sound.play('click');
-      tutStep = (tutStep + 1) % TUTORIAL.length;
+      tutStep = (tutStep + 1) % TUT_LINES.length;
       renderTutorial();
     });
     q('b-help-skip').addEventListener('click', function () { w.Sound.play('click'); go('s-home'); });
@@ -2228,7 +2240,7 @@
   function setHostMode(on) {
     hostMode = !!on;
     q('setup-online').hidden = !hostMode;
-    w.UI.setLabel(q('b-start'), hostMode ? '開房並開始 ▶' : '出題開始 ▶');
+    w.UI.setLabel(q('b-start'), hostMode ? tr('setup.startHost') : tr('setup.start'));
     setTimeout(function () { w.UI.paint(q('b-start')); }, 20);
   }
 
@@ -2241,6 +2253,57 @@
   }
 
   /* ---------- 啟動 ---------- */
+  /* 切換語言：靜態文字由 I18N.apply 處理；這裡把「由程式組出來的文字」用現有資料重畫，不動遊戲狀態 */
+  function syncLobbyLink() {
+    var a = D.querySelector('.lobby-home-link');
+    if (a) {
+      if (!a.getAttribute('data-base')) a.setAttribute('data-base', a.getAttribute('href'));
+      a.setAttribute('href', w.I18N.withLang(a.getAttribute('data-base')));
+    }
+  }
+  function onLangChange() {
+    syncLobbyLink();
+    q('logo').innerHTML = w.UI.logo();
+    refreshHome();
+    renderTutorial();
+    setHostMode(hostMode);
+    updateChatBadge();
+    if (state) { renderBoard(); toggleNoteLabel(); }
+    if (lastSay) sayKey(lastSay.key, lastSay.params, lastSay.kind);
+    if (cur === 's-result') renderResult();
+    if (cur === 's-stats') renderStats();
+    if (cur === 's-error') q('error-note').textContent = tr('error.noteLong');
+    /* 大廳 */
+    if (!q('lobby-off').hidden) q('lobby-off-note').textContent = w.Online.disabledReason();
+    if (lobbyMsg) setLobbyState(lobbyMsg.kind, '', lobbyMsg.key, lobbyMsg.params);
+    if (lastRooms !== undefined) renderRooms(lastRooms);
+    if (pendingInvite) {
+      q('lobby-invite-note').textContent = pendingInvite.token ? tr('lobby.inviteNoteToken') : tr('lobby.inviteNote');
+    }
+    /* 房主 */
+    renderHostConn();
+    if (!q('hostbar').hidden) {
+      renderHostViewers(host ? host.viewers : 0);
+      if (!host) q('h-code').textContent = tr('conn.opening');
+    }
+    /* 觀戰 */
+    renderWatchMeta();
+    if (watch && watch.view) renderWatchBoard();
+    if (watchFb) setWatchFeedbackKey(watchFb.key, watchFb.params, watchFb.kind);
+    renderWatchOverlay();
+    q('b-sum-toggle').textContent = q('w-summary').classList.contains('collapsed') ? tr('watch.expand') : tr('watch.collapse');
+    /* 留言板 */
+    renderChatRoom();
+    renderChatConn();
+    if (chatNoteKey) setChatNoteKey(chatNoteKey.key, chatNoteKey.bad);
+    /* 設定彈窗 */
+    if (isSettingsOpen()) syncSettings(); else setServerState(serverStateNow);
+    setTimeout(function () { w.UI.repaintAll(q(cur)); resizeBoard(); resizeWatchBoard(); }, 40);
+  }
+  function toggleNoteLabel() {
+    q('note-tag').textContent = noteMode ? tr('common.on') : tr('common.off');
+  }
+
   function init() {
     q('logo').innerHTML = w.UI.logo();
     w.UI.bgDeco(q('bgdeco'));
@@ -2258,6 +2321,11 @@
     renderTutorial();
     updateChatBadge();
     setChatVisible(false);
+    /* 語言切換鈕：緊鄰右上角設定鈕（樣式見 style.css 的 .lang-toggle） */
+    w.I18N.mountToggle({ after: q('b-settings') });
+    w.I18N.onChange(onLangChange);
+    w.I18N.apply();
+    onLangChange();
     /* 有 ?room=XXXX 就直接進觀戰，沒有就照常回主選單 */
     if (!deepLinkRoom()) go('s-home');
   }

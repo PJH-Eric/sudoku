@@ -11,6 +11,12 @@
   var S = w.Sudoku;
   var CELLS = 81;
 
+  function T(key, params) {
+    return (w.I18N && w.I18N.t) ? w.I18N.t(key, params) : key;
+  }
+  /* 復原紀錄只存代碼，顯示時才翻譯 */
+  function histLabel(code) { return T('hist.' + code); }
+
   var DEFAULT_OPTIONS = {
     autoClearNotes: true,   // 填入數字後自動清掉同列／行／宮筆記中的該數字
     markMistakes: true      // 是否即時標示填錯（規則核心一律記錄，這裡只影響 UI 要不要顯示）
@@ -141,16 +147,16 @@
   function setValue(state, index, digit, options) {
     var opts = options || {};
     if (state.status !== 'playing') {
-      return { ok: false, code: 'finished', message: '這一局已經完成了，可以按「再來一題」開始新的挑戰。' };
+      return { ok: false, code: 'finished', message: T('msg.finished') };
     }
     if (index < 0 || index >= CELLS) {
-      return { ok: false, code: 'range', message: '沒有選到格子，請先點一格再輸入數字。' };
+      return { ok: false, code: 'range', message: T('msg.range') };
     }
     if (state.given[index]) {
-      return { ok: false, code: 'given', message: '這格是題目原本就給的數字，不能修改。' };
+      return { ok: false, code: 'given', message: T('msg.given') };
     }
     if (digit < 1 || digit > 9) {
-      return { ok: false, code: 'digit', message: '只能填 1 到 9 的數字。' };
+      return { ok: false, code: 'digit', message: T('msg.digit') };
     }
     if (state.values[index] === digit) {
       /* 重複按同一個數字＝取消填入，是一個合法動作 */
@@ -176,7 +182,7 @@
 
     var wrong = digit !== state.solution[index];
     if (wrong) state.mistakes++;
-    pushHistory(state, wrong ? '填入（不符答案）' : '填入', before, after);
+    pushHistory(state, wrong ? 'fillWrong' : 'fill', before, after);
 
     var conflictFlags = S.findConflicts(state.values);
     return finishIfWon(state, {
@@ -184,8 +190,8 @@
       wrong: wrong,
       conflict: !!conflictFlags[index],
       message: wrong
-        ? (S.cellName(index) + ' 填了 ' + digit + '，和正確答案不一樣，可以按「復原」或直接改成別的數字。')
-        : (S.cellName(index) + ' 填入 ' + digit + '。'),
+        ? T('msg.fillWrong', { cell: S.cellName(index), d: digit })
+        : T('msg.fill', { cell: S.cellName(index), d: digit }),
       won: false
     });
   }
@@ -193,73 +199,73 @@
   /* ---------- 動作：筆記（候選數） ---------- */
   function toggleNote(state, index, digit) {
     if (state.status !== 'playing') {
-      return { ok: false, code: 'finished', message: '這一局已經完成了，可以按「再來一題」開始新的挑戰。' };
+      return { ok: false, code: 'finished', message: T('msg.finished') };
     }
     if (index < 0 || index >= CELLS) {
-      return { ok: false, code: 'range', message: '沒有選到格子，請先點一格再輸入數字。' };
+      return { ok: false, code: 'range', message: T('msg.range') };
     }
     if (state.given[index]) {
-      return { ok: false, code: 'given', message: '題目原本就給的數字不需要做筆記。' };
+      return { ok: false, code: 'given', message: T('msg.noteGiven') };
     }
     if (state.values[index]) {
-      return { ok: false, code: 'filled', message: '這格已經填了 ' + state.values[index] + '，先按「清除」才能做筆記。' };
+      return { ok: false, code: 'filled', message: T('msg.noteFilled', { d: state.values[index] }) };
     }
     if (digit < 1 || digit > 9) {
-      return { ok: false, code: 'digit', message: '只能記 1 到 9 的數字。' };
+      return { ok: false, code: 'digit', message: T('msg.noteDigit') };
     }
     var before = snapshotCells(state, [index]);
     state.notes[index] ^= S.BIT[digit];
     var after = snapshotCells(state, [index]);
-    pushHistory(state, '筆記', before, after);
+    pushHistory(state, 'note', before, after);
     var on = !!(state.notes[index] & S.BIT[digit]);
     return {
       ok: true, code: 'note', index: index, digit: digit, on: on,
-      message: S.cellName(index) + (on ? ' 記下候選數 ' : ' 取消候選數 ') + digit + '。'
+      message: T(on ? 'msg.noteOn' : 'msg.noteOff', { cell: S.cellName(index), d: digit })
     };
   }
 
   /* ---------- 動作：清除 ---------- */
   function clearCell(state, index) {
     if (state.status !== 'playing') {
-      return { ok: false, code: 'finished', message: '這一局已經完成了，可以按「再來一題」開始新的挑戰。' };
+      return { ok: false, code: 'finished', message: T('msg.finished') };
     }
     if (index < 0 || index >= CELLS) {
-      return { ok: false, code: 'range', message: '沒有選到格子，請先點一格再按清除。' };
+      return { ok: false, code: 'range', message: T('msg.rangeErase') };
     }
     if (state.given[index]) {
-      return { ok: false, code: 'given', message: '這格是題目原本就給的數字，不能清除。' };
+      return { ok: false, code: 'given', message: T('msg.givenErase') };
     }
     if (!state.values[index] && !state.notes[index]) {
-      return { ok: false, code: 'empty', message: '這格本來就是空的，沒有東西可以清除。' };
+      return { ok: false, code: 'empty', message: T('msg.emptyErase') };
     }
     var before = snapshotCells(state, [index]);
     state.values[index] = 0;
     state.notes[index] = 0;
     var after = snapshotCells(state, [index]);
-    pushHistory(state, '清除', before, after);
-    return { ok: true, code: 'clear', index: index, message: S.cellName(index) + ' 已清空。' };
+    pushHistory(state, 'clear', before, after);
+    return { ok: true, code: 'clear', index: index, message: T('msg.cleared', { cell: S.cellName(index) }) };
   }
 
   /* ---------- 動作：復原／重做 ---------- */
   function undo(state) {
     if (!state.history.length) {
-      return { ok: false, code: 'nothing', message: '目前沒有可以復原的步驟。' };
+      return { ok: false, code: 'nothing', message: T('msg.noUndo') };
     }
     var entry = state.history.pop();
     applyCells(state, entry.before);
     state.future.push(entry);
     if (state.status === 'won') { state.status = 'playing'; state.finishedAt = 0; }
-    return { ok: true, code: 'undo', message: '已復原「' + entry.label + '」。', index: entry.before[0] ? entry.before[0].i : -1 };
+    return { ok: true, code: 'undo', message: T('msg.undone', { label: histLabel(entry.label) }), index: entry.before[0] ? entry.before[0].i : -1 };
   }
   function redo(state) {
     if (!state.future.length) {
-      return { ok: false, code: 'nothing', message: '目前沒有可以重做的步驟。' };
+      return { ok: false, code: 'nothing', message: T('msg.noRedo') };
     }
     var entry = state.future.pop();
     applyCells(state, entry.after);
     state.history.push(entry);
     return finishIfWon(state, {
-      ok: true, code: 'redo', message: '已重做「' + entry.label + '」。',
+      ok: true, code: 'redo', message: T('msg.redone', { label: histLabel(entry.label) }),
       index: entry.after[0] ? entry.after[0].i : -1, won: false
     });
   }
@@ -267,31 +273,31 @@
   /* ---------- 動作：提示 ---------- */
   function hint(state) {
     if (state.status !== 'playing') {
-      return { ok: false, code: 'finished', message: '這一局已經完成了，不需要提示。' };
+      return { ok: false, code: 'finished', message: T('msg.hintFinished') };
     }
     /* 盤面上有填錯的數字時，先幫玩家找出錯誤，不然後面的推理都是白費的 */
     for (var i = 0; i < CELLS; i++) {
       if (!state.given[i] && state.values[i] && state.values[i] !== state.solution[i]) {
         return {
           ok: true, code: 'fix', index: i, digit: state.values[i], fix: true,
-          message: S.cellName(i) + ' 的 ' + state.values[i] + ' 和答案不符，先把它清掉再繼續推理。'
+          message: T('msg.hintWrong', { cell: S.cellName(i), d: state.values[i] })
         };
       }
     }
     var step = S.nextStep(state.values, state.solution);
     if (!step) {
-      return { ok: false, code: 'complete', message: '盤面已經沒有空格了。' };
+      return { ok: false, code: 'complete', message: T('msg.complete') };
     }
     var before = snapshotCells(state, [step.index]);
     state.values[step.index] = step.digit;
     state.notes[step.index] = 0;
     var after = snapshotCells(state, [step.index]);
     state.hintsUsed++;
-    pushHistory(state, '提示', before, after);
+    pushHistory(state, 'hint', before, after);
     return finishIfWon(state, {
       ok: true, code: 'hint', index: step.index, digit: step.digit,
       technique: step.technique, tier: step.tier,
-      message: '【' + step.technique + '】' + step.reason,
+      message: '【' + S.techLabel(step.technique) + '】' + step.reason,
       won: false
     });
   }
@@ -310,7 +316,7 @@
     state.status = 'playing';
     state.finishedAt = 0;
     state.createdAt = Date.now();
-    return { ok: true, code: 'restart', message: '已回到題目一開始的樣子。' };
+    return { ok: true, code: 'restart', message: T('msg.restarted') };
   }
 
   /* ---------- 存檔／讀檔（給 localStorage 用，本身不做 I/O） ---------- */

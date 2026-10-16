@@ -18,6 +18,10 @@
   var INJECTED = '';
   /* GAME_SERVER_URL:END */
 
+  function T(key, params) {
+    return (w.I18N && w.I18N.t) ? w.I18N.t(key, params) : key;
+  }
+
   /* 純函式：給定三個輸入，決定最後要用哪個 server URL。測試直接呼叫這一支。 */
   function resolve(injected, queryValue, pageProtocol) {
     var raw = String(queryValue || injected || '').trim();
@@ -77,10 +81,10 @@
 
     /* 給人看的一行說明，設定彈窗直接用 */
     describe: function () {
-      if (Config.status === 'invalid') return '設定有誤（已改用單機）';
-      if (!Config.serverUrl) return '未設定（單機模式）';
+      if (Config.status === 'invalid') return T('cfg.invalid');
+      if (!Config.serverUrl) return T('cfg.unset');
       var host = Config.serverUrl.replace(/^https?:\/\//, '');
-      return host + (Config.source === 'query' ? '（網址參數覆蓋）' : '');
+      return host + (Config.source === 'query' ? T('cfg.query') : '');
     },
 
     /* 打 /health 確認伺服器活著。單機模式不會發任何請求。
