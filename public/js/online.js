@@ -234,7 +234,7 @@
       if (!current || current.state !== 'open') { w.NetworkLatency.report(null); return; }
       latencyProbeInFlight = true;
       var started = performance.now();
-      request('GET', '/api/presence', null, function (err) {
+      request('GET', '/health', null, function (err) {
         if (session !== current) return;
         latencyProbeInFlight = false;
         w.NetworkLatency.report(err ? null : performance.now() - started);
