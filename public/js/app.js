@@ -1833,9 +1833,8 @@
   }
 
   /* ---------- 設定彈窗 ---------- */
-  /* 連線狀態：server URL 只從 GameConfig 拿，這裡不自己拼網址。
-   * 單機模式（沒設定）不會發出任何請求，畫面直接顯示「單機」。 */
-  var SERVER_STATES = { unset: 1, invalid: 1, checking: 1, ok: 1, fail: 1 };
+  /* 伺服器狀態只反映設定，不主動探測；進入線上模式時才建立連線。 */
+  var SERVER_STATES = { unset: 1, invalid: 1, ready: 1 };
   var serverStateNow = 'unset';
   function setServerState(state) {
     var pill = q('settings-server-state');
@@ -1850,8 +1849,7 @@
     var urlEl = q('settings-server-url');
     if (!C || !urlEl) return;
     urlEl.textContent = C.describe();
-    setServerState(C.status);
-    C.checkHealth(setServerState);
+    setServerState(C.status === 'ok' ? 'ready' : C.status);
   }
 
   function syncSettings() {

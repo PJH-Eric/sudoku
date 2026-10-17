@@ -87,26 +87,6 @@
       return host + (Config.source === 'query' ? T('cfg.query') : '');
     },
 
-    /* 打 /health 確認伺服器活著。單機模式不會發任何請求。
-     * cb(state)：'unset' ｜ 'invalid' ｜ 'checking' ｜ 'ok' ｜ 'fail'
-     * 免費雲端服務常常在睡覺，冷啟動可能要十幾秒，所以逾時放寬到 8 秒。 */
-    checkHealth: function (cb) {
-      if (!Config.isOnlineEnabled()) return cb(Config.status);
-      if (typeof w.fetch !== 'function') return cb('fail');
-      cb('checking');
-      var done = false;
-      var timer = setTimeout(function () { if (!done) { done = true; cb('fail'); } }, 8000);
-      w.fetch(Config.url('/health'), { method: 'GET', cache: 'no-store' })
-        .then(function (res) { return res.ok ? 'ok' : 'fail'; })
-        .catch(function () { return 'fail'; })
-        .then(function (state) {
-          if (done) return;
-          done = true;
-          clearTimeout(timer);
-          cb(state);
-        });
-    },
-
     /* 測試用：不依賴瀏覽器環境也能驗證解析規則 */
     _resolve: resolve
   };

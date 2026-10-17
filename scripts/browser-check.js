@@ -11,7 +11,7 @@
  *   - 每格右上角格子留言三角形可以展開留言區
  *   - 線上觀戰者可以輸入格子留言，且不會出現數字輸入／遊戲提示
  *   - 重新載入後可以續玩
- *   - server URL 參數化：單機／已連線／設定錯誤／連不上
+ *   - server URL 參數化：單機／設定完成但未連線／設定錯誤
  * 螢幕截圖會存到 screenshots/。
  */
 'use strict';
@@ -679,12 +679,19 @@ async function main() {
 
   await goto(BASE + '?server=' + encodeURIComponent('http://127.0.0.1:' + PORT));
   await sleep(250);
+  await cdp.eval(
+    "window.__settingsFetches=[]; window.__settingsOriginalFetch=window.fetch;" +
+    "window.fetch=function(){window.__settingsFetches.push(String(arguments[0]));" +
+    "return window.__settingsOriginalFetch.apply(this,arguments);}; return 1;"
+  );
   await cdp.eval(readServerRow + ' return 1;');
   await sleep(1200);
   const onlineRaw = await cdp.eval(dumpServerRow);
   const online = JSON.parse(onlineRaw);
-  check('?server= 指到真的伺服器時，/health 回應後顯示「已連線」',
-    online.status === 'ok' && online.source === 'query' && online.state === 'ok' && online.pill === '已連線', onlineRaw);
+  const settingsFetches = await cdp.eval('return JSON.stringify(window.__settingsFetches);');
+  check('?server= 有效時只顯示設定完成，打開設定不會喚醒伺服器',
+    online.status === 'ok' && online.source === 'query' && online.state === 'ready' && online.pill === '已設定' &&
+      JSON.parse(settingsFetches).length === 0, onlineRaw + ' requests=' + settingsFetches);
 
   await goto(BASE + '?server=' + encodeURIComponent('沒有這種網址'));
   await sleep(250);
@@ -695,21 +702,22 @@ async function main() {
   check('server URL 格式錯誤時退回單機並標示「設定錯誤」',
     bad.status === 'invalid' && bad.url === null && bad.state === 'invalid' && bad.pill === '設定錯誤', badRaw);
 
-  /* 故意指到一個沒人在聽的埠：瀏覽器一定會記一筆網路錯誤，這是預期中的 */
-  const errorsBefore = consoleErrors.length;
+  /* 指到一個沒人在聽的埠：打開設定頁不應探測該服務或產生網路錯誤。 */
   await goto(BASE + '?server=' + encodeURIComponent('http://127.0.0.1:9'));
   await sleep(250);
+  await cdp.eval(
+    "window.__settingsFetches=[]; window.__settingsOriginalFetch=window.fetch;" +
+    "window.fetch=function(){window.__settingsFetches.push(String(arguments[0]));" +
+    "return window.__settingsOriginalFetch.apply(this,arguments);}; return 1;"
+  );
   await cdp.eval(readServerRow + ' return 1;');
-  await sleep(2500);
+  await sleep(400);
   const downRaw = await cdp.eval(dumpServerRow);
   const down = JSON.parse(downRaw);
-  check('伺服器連不上時顯示「連不上」，遊戲仍可繼續玩',
-    down.status === 'ok' && down.state === 'fail' && down.pill === '連不上', downRaw);
-  const newErrors = consoleErrors.slice(errorsBefore);
-  check('連不上的那一筆確實有發出請求（瀏覽器記到網路錯誤）',
-    newErrors.some((e) => e.indexOf('127.0.0.1:9') >= 0), newErrors.join(' | ') || '沒有任何網路錯誤');
-  const unexpected = newErrors.filter((e) => e.indexOf('127.0.0.1:9') < 0);
-  check('除了預期的連線失敗以外沒有其他主控台錯誤', unexpected.length === 0, unexpected.join(' | '));
+  const deadServerFetches = await cdp.eval('return JSON.stringify(window.__settingsFetches);');
+  check('伺服器尚未回應時設定頁也不會探測，遊戲仍可單機使用',
+    down.status === 'ok' && down.state === 'ready' && down.pill === '已設定' && JSON.parse(deadServerFetches).length === 0,
+    downRaw + ' requests=' + deadServerFetches);
 
   const playable = await cdp.eval(
     "var s=Sudoku.generatePuzzle({difficulty:'easy',seed:'OFFLINE'});" +

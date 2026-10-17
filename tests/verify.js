@@ -1329,14 +1329,10 @@ ok('格式錯誤的 server URL 會被擋下並退回單機，不會靜默用 loc
   assert.strictEqual(okHttp.status, 'ok', 'http 頁面連 http 伺服器是合理的');
 });
 
-ok('單機模式不會發出任何網路請求', () => {
-  const box = loadConfig('', '', 'https:');
-  let called = 0;
-  box.fetch = function () { called++; return Promise.resolve({ ok: true }); };
-  const states = [];
-  box.GameConfig.checkHealth((s) => states.push(s));
-  assert.strictEqual(called, 0, '沒有設定伺服器就不該打 API');
-  assert.deepStrictEqual(states, ['unset']);
+ok('設定頁不會探測伺服器，Render 只會在線上流程連線', () => {
+  const configured = loadConfig('https://sudoku.example.com', '', 'https:').GameConfig;
+  assert.strictEqual(typeof configured.checkHealth, 'undefined', '設定模組不提供會喚醒伺服器的健康檢查');
+  assert.ok(!/\.checkHealth\s*\(/.test(appSource), '設定彈窗不可呼叫健康檢查');
 });
 
 ok('連線位置只在 config.js 定義，其他前端檔案不硬編碼網址', () => {
