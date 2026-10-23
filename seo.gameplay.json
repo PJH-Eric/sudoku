@@ -1,0 +1,32 @@
+{
+  "zh-Hant": {
+    "name": "數獨小學堂",
+    "summary": "填滿 9×9 格子，讓每一列、每一行和每一宮都剛好不重複。",
+    "modes": [
+      "單機解題",
+      "線上觀戰",
+      "格子留言"
+    ],
+    "controls": "選擇格子，再用數字鍵盤填入"
+  },
+  "zh-Hans": {
+    "name": "数独小学堂",
+    "summary": "填满 9×9 格子，让每一列、每一行和每一宫都刚好不重复。",
+    "modes": [
+      "单机解题",
+      "线上观战",
+      "格子留言"
+    ],
+    "controls": "选择格子，再用数字键盘填入"
+  },
+  "en": {
+    "name": "Sudoku School",
+    "summary": "Fill the 9×9 grid so every row, column, and box has each number exactly once.",
+    "modes": [
+      "Solo Puzzles",
+      "Online Spectating",
+      "Cell Notes"
+    ],
+    "controls": "Select a cell, then fill it in with the number pad"
+  }
+}
