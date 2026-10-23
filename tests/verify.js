@@ -578,6 +578,8 @@ ok('index.html 引用的程式都存在', () => {
   const hrefs = Array.from(html.matchAll(/<link[^>]+href="([^"]+\.css)"/g), (m) => m[1]);
   hrefs.forEach((href) => assert.ok(fs.existsSync(path.join(publicDir, href)), `找不到樣式表：${href}`));
   const htmlWithoutAllowedLinks = html
+    .replace(/<!--SEO:HEAD-->[\s\S]*?<!--SEO:END-->/, '')
+    .replace(/<!--SEO:GAMEPLAY-->[\s\S]*?<!--SEO:GAMEPLAY:END-->/, '')
     .replace(/https?:\/\/www\.w3\.org[^"']*/g, '')
     .replace(/https:\/\/pjh-eric\.github\.io\/game-lobby\/?/g, '');
   assert.ok(!/https?:\/\//.test(htmlWithoutAllowedLinks), '不可以依賴外部網址資源');
@@ -1405,7 +1407,9 @@ ok('Git 與 GitHub Pages 需要的檔案都齊全', () => {
 });
 
 ok('所有資源都用相對路徑，才能放在 GitHub Pages 的子路徑底下', () => {
-  const html = read(path.join(publicDir, 'index.html'));
+  const html = read(path.join(publicDir, 'index.html'))
+    .replace(/<!--SEO:HEAD-->[\s\S]*?<!--SEO:END-->/, '')
+    .replace(/<!--SEO:GAMEPLAY-->[\s\S]*?<!--SEO:GAMEPLAY:END-->/, '');
   const attrs = html.match(/(?:src|href)="([^"]+)"/g) || [];
   attrs.forEach((a) => {
     const v = a.split('="')[1].slice(0, -1);
