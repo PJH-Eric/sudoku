@@ -8,6 +8,6 @@
   "genre": "數獨",
   "players": "1",
   "iconUrl": "https://pjh-eric.github.io/sudoku/favicon-96.png",
-  "ogImage": "https://pjh-eric.github.io/sudoku/og-image.png",
-  "ogImageAlt": "數獨小學堂遊戲圖示"
+  "ogImage": "https://pjh-eric.github.io/sudoku/assets/images/cover.webp",
+  "ogImageAlt": "數獨小學堂 遊戲封面"
 }
