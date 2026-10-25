@@ -459,7 +459,10 @@ async function main() {
       check('觸控短按三角形只選格，不會誤開留言', tap.selected && !tap.open, JSON.stringify(tap));
       const hold = await touchCorner(650, false);
       check('觸控長按可查看留言，放開後不會被合成點擊關閉', hold.selected && hold.open, JSON.stringify(hold));
-      await cdp.eval("document.querySelector('#board .cell').click(); return 1;");
+      const dismiss = await touchCorner(40, false);
+      check('留言開啟後再短按同一格三角形即可收起', dismiss.selected && !dismiss.open, JSON.stringify(dismiss));
+      const repeatTap = await touchCorner(40, false);
+      check('收起後再次短按不會重新開啟留言', repeatTap.selected && !repeatTap.open, JSON.stringify(repeatTap));
       const moved = await touchCorner(650, true);
       check('觸控滑動取消長按留言', !moved.open, JSON.stringify(moved));
       await cdp.eval("document.querySelector('#board .cell').click(); return 1;");
