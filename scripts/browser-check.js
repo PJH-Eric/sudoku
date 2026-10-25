@@ -127,6 +127,8 @@ const PAGE_HELPERS = `
       var vw = window.innerWidth, vh = window.innerHeight;
       var fab = document.getElementById('b-settings');
       var fr = fab.getBoundingClientRect();
+      var toolbar = fab.closest('.language-controls');
+      var toolbarRect = toolbar ? toolbar.getBoundingClientRect() : fr;
       var small = [];
       /* 盤面格子是 9×9 固定格線的一部分，尺寸由盤面決定，另外用 boardCells 檢查 */
       var list = document.querySelectorAll('.screen.active button:not(.cell), .settings-modal.open button, .screen.active input');
@@ -145,11 +147,11 @@ const PAGE_HELPERS = `
       }
       /* 設定鈕是固定定位的，必須確認它沒有壓到其他可操作的元素 */
       var covered = [];
-      var clickable = document.querySelectorAll('.screen.active button:not(#b-settings), .screen.active input, .screen.active .optcard');
+      var clickable = document.querySelectorAll('.screen.active button:not(#b-settings), .screen.active input, .screen.active .optcard, .settings-modal.open button, .room-info-modal.open button');
       for (var k = 0; k < clickable.length; k++) {
         var cr = clickable[k].getBoundingClientRect();
         if (cr.width === 0 || cr.height === 0) continue;
-        if (cr.left < fr.right && cr.right > fr.left && cr.top < fr.bottom && cr.bottom > fr.top) {
+        if (cr.left < toolbarRect.right && cr.right > toolbarRect.left && cr.top < toolbarRect.bottom && cr.bottom > toolbarRect.top) {
           covered.push(clickable[k].id || clickable[k].className);
         }
       }
@@ -288,7 +290,10 @@ async function main() {
   }
 
   /* ================= 各尺寸的版面檢查 ================= */
-  for (const v of VIEWPORTS) {
+  const requestedViewports = process.env.BROWSER_VIEWPORTS ? process.env.BROWSER_VIEWPORTS.split(',') : null;
+  const viewports = VIEWPORTS.filter((v) => !requestedViewports || requestedViewports.includes(v.width + 'x' + v.height));
+  if (!viewports.length) throw new Error('BROWSER_VIEWPORTS 未符合任何既有測試尺寸');
+  for (const v of viewports) {
     console.log('\n【' + v.name + ' ' + v.width + '×' + v.height + '】');
     await setViewport(v);
     await goto(BASE);

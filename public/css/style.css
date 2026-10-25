@@ -1046,6 +1046,18 @@ input,textarea,select{user-select:text;-webkit-user-select:text}
 .custom-scrollbar-thumb{position:absolute;top:0;left:1px;width:8px;border:2px solid var(--ink);border-radius:10px;background:var(--grape-d)}
 .custom-scrollbar:focus-visible{outline:3px solid var(--sky-d);outline-offset:2px}
 
+/* 全域語言工具列維持可用，手機與平板面板從工具列下方開始。 */
+@media (max-width:1100px){
+  #s-setup > .panel,#s-help > .panel,#s-stats > .panel,#s-lobby > .panel{
+    margin-top:calc(74px + env(safe-area-inset-top));
+  }
+  .panel-head{padding-right:0}
+  .settings-modal,.room-info-modal{
+    padding:calc(74px + env(safe-area-inset-top)) 10px calc(12px + env(safe-area-inset-bottom));
+  }
+  .settings-panel,.room-info-panel{max-height:100%}
+}
+
 /* iOS 對 font-size < 16px 的欄位聚焦時會自動放大整頁，放大後輸入框常被推出畫面 */
 @media (pointer:coarse){
   .chatbar .field,.chat-form input,.chatform input,
