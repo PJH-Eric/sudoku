@@ -314,6 +314,19 @@
     var wrap = screen.querySelector('.boardwrap');
     if (!wrap) return;
     var w1 = wrap.clientWidth, h1 = wrap.clientHeight;
+    if (screenId === 's-game' && w.matchMedia('(orientation:portrait)').matches) {
+      var body = screen.querySelector('.gamebody');
+      var bodyStyle = w.getComputedStyle(body);
+      var screenStyle = w.getComputedStyle(screen);
+      h1 = screen.clientHeight - screen.querySelector('.gtop').offsetHeight -
+        screen.querySelector('.gfoot').offsetHeight - screen.querySelector('.padwrap').offsetHeight -
+        parseFloat(bodyStyle.paddingTop) - parseFloat(bodyStyle.paddingBottom) -
+        parseFloat(bodyStyle.rowGap) - parseFloat(screenStyle.paddingTop) - parseFloat(screenStyle.paddingBottom);
+      var boardSize = Math.max(180, Math.floor(Math.min(w1, h1)) - 2);
+      wrap.style.setProperty('--board-size', boardSize + 'px');
+    } else {
+      wrap.style.removeProperty('--board-size');
+    }
     if (!w1 || !h1) return;
     var size = Math.max(180, Math.floor(Math.min(w1, h1)) - 2);
     board.style.setProperty('--bs', size + 'px');

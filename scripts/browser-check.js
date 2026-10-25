@@ -12,20 +12,23 @@
  *   - 線上觀戰者可以輸入格子留言，且不會出現數字輸入／遊戲提示
  *   - 重新載入後可以續玩
  *   - server URL 參數化：單機／設定完成但未連線／設定錯誤
- * 螢幕截圖會存到 screenshots/。
+ * 指定 SCREENSHOT_DIR 時才保存截圖；瀏覽器設定檔於測試結束後自動清除。
  */
 'use strict';
 
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const ROOT = path.resolve(__dirname, '..');
 const PORT = Number(process.env.PORT || 3011);
 const BASE = 'http://127.0.0.1:' + PORT + '/';
 const DEBUG_PORT = Number(process.env.CDP_PORT || 9333);
-const PROFILE = path.join(ROOT, '.chrome-rwd-test');
-const SHOTS = path.join(ROOT, 'screenshots');
+const PROFILE = fs.mkdtempSync(path.join(os.tmpdir(), 'sudoku-rwd-'));
+const SHOTS = process.env.SCREENSHOT_DIR ? path.resolve(process.env.SCREENSHOT_DIR) : null;
+let server;
+let browser;
 
 const VIEWPORTS = [
   { name: '手機窄版直向', width: 360, height: 640, mobile: true, dsf: 2 },
@@ -86,13 +89,16 @@ class CDP {
     const id = ++this.id;
     this.ws.send(JSON.stringify({ id, method, params: params || {} }));
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         if (this.pending.has(id)) {
           this.pending.delete(id);
           reject(new Error('CDP timeout: ' + method));
         }
       }, 30000);
+      this.pending.set(id, {
+        resolve: (value) => { clearTimeout(timeout); resolve(value); },
+        reject: (error) => { clearTimeout(timeout); reject(error); }
+      });
     });
   }
   on(method, fn) {
@@ -192,32 +198,18 @@ async function main() {
   const chrome = findChrome();
   if (!chrome) {
     console.log('找不到 Chrome 或 Edge，略過瀏覽器檢查。設定 CHROME_PATH 環境變數後可再執行。');
-    process.exit(0);
+    return;
   }
-  fs.mkdirSync(SHOTS, { recursive: true });
+  if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
 
   console.log('啟動靜態伺服器 (port ' + PORT + ')…');
-  const server = spawn(process.execPath, [path.join(ROOT, 'server.js')], {
+  server = spawn(process.execPath, [path.join(ROOT, 'server.js')], {
     env: Object.assign({}, process.env, { PORT: String(PORT) }),
     stdio: 'ignore'
   });
   await sleep(700);
-  const onlineRoomResponse = await fetch('http://127.0.0.1:' + PORT + '/api/rooms', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      hostName: '瀏覽器測試主持人', difficulty: 'easy', label: '簡單', seed: 'BROW',
-      snapshot: {
-        puzzle: '0'.repeat(81), values: '0'.repeat(81), notes: new Array(81).fill(0),
-        selected: -1, elapsedMs: 0, hintsUsed: 0, mistakes: 0, status: 'playing'
-      }
-    })
-  });
-  const onlineRoom = await onlineRoomResponse.json();
-  if (!onlineRoomResponse.ok || !onlineRoom.ok) throw new Error('無法建立瀏覽器線上觀戰測試房間');
-
   console.log('啟動無頭瀏覽器…');
-  const browser = spawn(chrome, [
+  browser = spawn(chrome, [
     '--headless=new',
     '--disable-gpu',
     '--no-first-run',
@@ -269,6 +261,14 @@ async function main() {
     await sleep(600);
   }
   async function shot(name) {
+    for (const lang of ['en', 'zh-Hans', 'zh-Hant']) {
+      await cdp.eval('I18N.setLang(' + JSON.stringify(lang) + '); return 1;');
+      await sleep(160);
+      const layout = JSON.parse(await cdp.eval('return JSON.stringify(window.__probe.layout());'));
+      check(name + ' ' + lang + ' 無水平溢出／設定遮擋', !layout.overflowing.length && !layout.fabCovers.length,
+        JSON.stringify(layout));
+    }
+    if (!SHOTS) return;
     const res = await cdp.send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync(path.join(SHOTS, name + '.png'), Buffer.from(res.data, 'base64'));
   }
@@ -313,6 +313,14 @@ async function main() {
     );
     const mo = JSON.parse(modalOpen);
     check('設定按鈕會開出 Modal 彈窗且焦點進入彈窗', mo.open && mo.hidden === 'false' && mo.focus === 'settings-panel' && mo.expanded === 'true', modalOpen);
+    const scrollArea = JSON.parse(await cdp.eval(
+      "var area=document.getElementById('settings-body');" +
+      "var rail=document.querySelector('.custom-scrollbar[aria-controls=\"settings-body\"]');" +
+      "if(rail && !rail.hidden){rail.dispatchEvent(new KeyboardEvent('keydown',{key:'End',bubbles:true}));}" +
+      "var result={overflow:area.scrollHeight>area.clientHeight+1,rail:!!rail && !rail.hidden,end:Math.abs(area.scrollTop+area.clientHeight-area.scrollHeight)<2};" +
+      "area.scrollTop=0;document.getElementById('settings-panel').focus();return JSON.stringify(result);"
+    ));
+    check('設定自訂捲軸可用鍵盤到達最後一項', !scrollArea.overflow || (scrollArea.rail && scrollArea.end), JSON.stringify(scrollArea));
     L = await cdp.eval('return JSON.stringify(window.__probe.layout());');
     screensToCheck.push(['設定彈窗', JSON.parse(L)]);
     await shot(v.name + '-2-設定彈窗');
@@ -382,6 +390,32 @@ async function main() {
     }
     check('格子留言三角形縮小避免誤按', boardInfo.noteCorner <= 12,
       '三角形 ' + boardInfo.noteCorner + 'px');
+    const fitted = JSON.parse(await cdp.eval(
+      "var board=document.getElementById('board').getBoundingClientRect();" +
+      "var pad=document.querySelector('#s-game .padwrap').getBoundingClientRect();" +
+      "var keys=Array.from(document.querySelectorAll('#numpad button')).map(function(b){var r=b.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right};});" +
+      "return JSON.stringify({gap:pad.top-board.bottom,keys:keys,padBottom:pad.bottom,padHeight:document.querySelector('#s-game .padwrap').clientHeight,padScroll:document.querySelector('#s-game .padwrap').scrollHeight});"
+    ));
+    check('完整數字盤留在可視區且不需局部捲動', fitted.keys.length === 9 &&
+      fitted.keys.every((r) => r.top >= 0 && r.bottom <= v.height && r.left >= 0 && r.right <= v.width) &&
+      fitted.padScroll <= fitted.padHeight + 1, JSON.stringify(fitted));
+    if (v.height > v.width) check('直向棋盤緊鄰操作區', fitted.gap >= 0 && fitted.gap <= 18, JSON.stringify(fitted));
+    for (const lang of ['en', 'zh-Hans', 'zh-Hant']) {
+      await cdp.eval('I18N.setLang(' + JSON.stringify(lang) + '); return 1;');
+      await sleep(180);
+      const translated = JSON.parse(await cdp.eval('return JSON.stringify(window.__probe.layout());'));
+      check(lang + ' 遊戲控制不溢出且設定鈕不遮擋', !translated.overflowing.length && !translated.fabCovers.length,
+        JSON.stringify(translated));
+      const counters = JSON.parse(await cdp.eval(
+        "var ids=['st-left','st-hint','st-miss'];var values=ids.map(function(id){return document.getElementById(id).textContent;});" +
+        "ids.forEach(function(id){document.getElementById(id).textContent='888';});" +
+        "var boxes=ids.map(function(id){var el=document.getElementById(id),p=el.parentNode.getBoundingClientRect(),r=el.getBoundingClientRect();" +
+        "return {width:p.width,top:r.top,fits:el.scrollWidth<=el.clientWidth+1 && r.left>=p.left && r.right<=p.right};});" +
+        "ids.forEach(function(id,i){document.getElementById(id).textContent=values[i];});return JSON.stringify(boxes);"
+      ));
+      check(lang + ' 剩餘／提示／填錯等寬對齊且容納三位數', counters.every((r) => r.fits &&
+        Math.abs(r.width - counters[0].width) < 1 && Math.abs(r.top - counters[0].top) < 1), JSON.stringify(counters));
+    }
     const noteChrome = JSON.parse(await cdp.eval(
       "var corner=document.querySelector('#board .cell .cell-note-corner');" +
       "if(corner) corner.click();" +
@@ -396,6 +430,16 @@ async function main() {
     ));
     check('玩家點整格不會展開格子留言', noteChrome.playerClickOpens === false, JSON.stringify(noteChrome));
     check('每格都有右上角小型格子留言三角形且可展開', noteChrome.corners === 81 && noteChrome.size <= 18 && noteChrome.open, JSON.stringify(noteChrome));
+    await cdp.eval("document.querySelector('#board .cell .cell-note-corner').click(); return 1;");
+    if (v.width === 390) {
+      const seedBefore = await cdp.eval("return document.getElementById('g-seed').textContent;");
+      await setViewport(VIEWPORTS[2]);
+      await setViewport(v);
+      const rotated = JSON.parse(await cdp.eval('return JSON.stringify(window.__probe.board());'));
+      const seedAfter = await cdp.eval("return document.getElementById('g-seed').textContent;");
+      check('直橫向旋轉保留同一局且恢復完整棋盤', seedBefore === seedAfter && rotated.width >= boardMinimum,
+        JSON.stringify(rotated));
+    }
     await shot(v.name + '-5-遊戲中');
 
     /* 暫停 */
@@ -816,6 +860,20 @@ async function main() {
   await cdp.eval("var close=document.getElementById('b-close-room'); if(!close.hidden) close.click(); return 1;");
 
   /* ---------- 線上觀戰者 UI：只允許格子留言與聊天室 ---------- */
+  /* 在使用前才建立測試房間，避免完整三語巡檢超過主持人斷線寬限期。 */
+  const onlineRoomResponse = await fetch('http://127.0.0.1:' + PORT + '/api/rooms', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      hostName: '瀏覽器測試主持人', difficulty: 'easy', label: '簡單', seed: 'BROW',
+      snapshot: {
+        puzzle: '0'.repeat(81), values: '0'.repeat(81), notes: new Array(81).fill(0),
+        selected: -1, elapsedMs: 0, hintsUsed: 0, mistakes: 0, status: 'playing'
+      }
+    })
+  });
+  const onlineRoom = await onlineRoomResponse.json();
+  if (!onlineRoomResponse.ok || !onlineRoom.ok) throw new Error('無法建立瀏覽器線上觀戰測試房間');
   await setViewport(VIEWPORTS[1]);
   await goto(BASE + '?server=' + encodeURIComponent('http://127.0.0.1:' + PORT) +
     '&room=' + encodeURIComponent(onlineRoom.code) + '&invite=' + encodeURIComponent(onlineRoom.inviteToken));
@@ -871,23 +929,26 @@ async function main() {
     JSON.stringify(popover));
 
   /* ---------- 收尾 ---------- */
+  await cdp.send('Browser.close').catch(() => {});
   try { ws.close(); } catch (e) {}
-  browser.kill();
-  server.kill();
   await sleep(300);
 
-  console.log('\n螢幕截圖已存到：' + SHOTS);
+  if (SHOTS) console.log('\n螢幕截圖已存到：' + SHOTS);
   if (notes.length) notes.forEach((n) => console.log('格子留言：' + n));
   if (failures.length) {
     console.log('\n共 ' + failures.length + ' 項未通過：');
     failures.forEach((f) => console.log('  - ' + f));
-    process.exit(1);
+    process.exitCode = 1;
   }
-  console.log('\n瀏覽器檢查全部通過。\n');
-  process.exit(0);
+  if (!failures.length) console.log('\n瀏覽器檢查全部通過。\n');
 }
 
 main().catch((err) => {
   console.error('瀏覽器檢查失敗：', err);
-  process.exit(1);
+  process.exitCode = 1;
+}).finally(async () => {
+  if (browser) browser.kill();
+  if (server) server.kill();
+  await sleep(600);
+  fs.rmSync(PROFILE, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 });

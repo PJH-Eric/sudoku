@@ -262,3 +262,5 @@ node scripts/inject-server-url.js --clear
 以 `package.json` 的 scripts 為可執行指令來源；`npm test` 執行基本驗證，`npm run verify` 執行該專案列出的整合驗證。需要 Playwright、瀏覽器或網路的檢查，依各測試章節的前置條件執行。
 
 截圖、測試報告、記錄檔及快取為可重新產生的驗證產物，不屬於正式遊戲資產，也不提交版本控制。測試完成後可清除 `screenshots/`、`shots/`、`.shots/`、`test-results/`、`playwright-report/`、`coverage/`、`.cache/`、`tmp/`、`temp/` 與 `*.log`。保留正式圖片、圖示、音訊、字型、原始碼、測試案例、鎖定檔及 `.env.example`；`node_modules/` 是相依套件目錄，不能當成圖片或暫存檔一起刪除。
+
+`npm run test:browser` 預設不產生截圖，並於結束時自動清除測試用瀏覽器設定檔。需要視覺驗收時，先指定 `SCREENSHOT_DIR` 為輸出目錄；例如 PowerShell：`$env:SCREENSHOT_DIR = Join-Path $env:TEMP 'sudoku-review'`。檢查包含手機與平板直橫向、三語版面、等寬統計與三位數計數、旋轉續玩，以及自訂捲軸的鍵盤操作。

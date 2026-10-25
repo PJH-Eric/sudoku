@@ -726,6 +726,13 @@ body{
   .padwrap{max-width:720px;width:100%;margin:0 auto}
 }
 
+/* 直向將棋盤和輸入盤組成一組，不把剩餘高度分散在兩者之間。 */
+@media (orientation:portrait){
+  #s-game .gamebody{justify-content:center;align-items:center}
+  #s-game .boardwrap{flex:0 0 auto;width:100%;height:var(--board-size,auto)}
+  #s-game .padwrap{width:100%;max-width:760px}
+}
+
 /* ---------- 手機窄版 ---------- */
 @media (max-width:560px){
   .settings-fab{top:calc(7px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));--d:5px}
@@ -863,6 +870,53 @@ body{
   .board{--bs:min(92vw,44dvh)}
 }
 
+/* 計時與三項統計共用一列：統計等寬、數字固定對齊，不隨位數跳動。 */
+#s-game .statbar{
+  display:grid;grid-template-columns:minmax(max-content,1.7fr) repeat(3,minmax(0,1fr));
+  width:100%;max-width:800px;margin:0 auto;gap:6px;
+}
+#s-game .statbar > .stat{
+  min-width:0;min-height:52px;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;padding:4px 6px;border-width:2px;border-radius:14px;
+}
+#s-game .statbar > .stat-time{flex-direction:row;gap:5px;padding:2px 6px}
+#s-game .statbar .k{font-size:.7rem;line-height:1.2;overflow-wrap:anywhere;text-align:center}
+#s-game .statbar b{font-size:1.2rem;line-height:1.15;font-variant-numeric:tabular-nums}
+#st-left{color:var(--grape-t)}
+#s-game .statbar > .stat:nth-child(2){background:#F6F0FF}
+#s-game .statbar > .stat:nth-child(3){background:#FFF9EA}
+#s-game .statbar > .stat:nth-child(4){background:#FFF0F3}
+@media (max-width:599px){
+  #s-game .stat-time > .k{display:none}
+  #s-game .statbar .stat-action-label{display:none}
+}
+@media (orientation:landscape) and (max-height:520px){
+  #s-game .statbar{display:flex;flex:1;padding:1px 0 0}
+  #s-game .statbar > .stat{flex:1;min-height:44px;padding:1px 5px}
+  #s-game .statbar > .stat-time{flex:0 0 auto}
+  #s-game .statbar b{font-size:.95rem}
+  #s-game .statbar .k{font-size:.64rem}
+  #s-game .stat-time > .k{display:none}
+  #s-game .statbar .stat-action-label{display:none}
+}
+
+/* 平板操作區使用可讀字級，與棋盤共用寬度；手機維持雙排數字鍵。 */
+@media (min-width:600px) and (min-height:600px){
+  #s-game .tools .btn3d{min-height:54px;font-size:.85rem;padding:6px 4px calc(6px + var(--d))}
+  #s-game .tools .b3-lbl{flex-direction:row;gap:4px}
+  #s-game .tools .tx{font-size:.85rem}
+  #s-game .tools .ico{font-size:1.15rem}
+  #s-game .tools .tag{font-size:.7rem}
+  #s-game .numkey{min-height:54px}
+  #s-game .numkey .nk{font-size:1.5rem}
+  #s-game .numkey .nleft{font-size:.72rem}
+}
+@media (orientation:portrait) and (max-width:599px){
+  #s-game .numpad{grid-template-columns:repeat(10,minmax(0,1fr))}
+  #s-game .numkey{grid-column:span 2}
+  #s-game .numkey:nth-child(6){grid-column:2 / span 2}
+}
+
 /* ============================================================
  * 線上觀戰相關畫面的 RWD
  * 版面策略：
@@ -985,6 +1039,12 @@ body{
 
 /* 版面用 user-select:none 防拖曳，但可輸入的欄位一定要能選字 */
 input,textarea,select{user-select:text;-webkit-user-select:text}
+
+.custom-scroll-area{scrollbar-width:none;scrollbar-gutter:auto}
+.custom-scroll-area::-webkit-scrollbar{display:none}
+.custom-scrollbar{position:fixed;z-index:120;width:10px;border-radius:10px;background:#EEE6F5;touch-action:none;cursor:pointer}
+.custom-scrollbar-thumb{position:absolute;top:0;left:1px;width:8px;border:2px solid var(--ink);border-radius:10px;background:var(--grape-d)}
+.custom-scrollbar:focus-visible{outline:3px solid var(--sky-d);outline-offset:2px}
 
 /* iOS 對 font-size < 16px 的欄位聚焦時會自動放大整頁，放大後輸入框常被推出畫面 */
 @media (pointer:coarse){
