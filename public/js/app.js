@@ -153,6 +153,49 @@
     cell.appendChild(popover);
   }
 
+  function bindTouchCellNotes(board) {
+    var timer = null;
+    var touchInput = false;
+    var held = false;
+    var origin = null;
+    function cancel() {
+      if (timer) clearTimeout(timer);
+      timer = null;
+    }
+    board.addEventListener('pointerdown', function (e) {
+      cancel();
+      touchInput = e.pointerType === 'touch' || e.pointerType === 'pen';
+      held = false;
+      var cell = e.target.closest ? e.target.closest('.cell') : null;
+      if (!touchInput || !e.isPrimary || !cell || paused || cur !== 's-game') return;
+      origin = { x: e.clientX, y: e.clientY };
+      timer = setTimeout(function () {
+        timer = null;
+        if (paused || cur !== 's-game') return;
+        held = true;
+        toggleHostCellNotes(parseInt(cell.getAttribute('data-i'), 10));
+      }, 500);
+    });
+    board.addEventListener('pointermove', function (e) {
+      if (origin && Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > 10) cancel();
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (name) {
+      board.addEventListener(name, cancel);
+    });
+    board.addEventListener('click', function (e) {
+      if (!held) return;
+      held = false;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }, true);
+    board.addEventListener('contextmenu', function (e) { if (touchInput) e.preventDefault(); });
+    w.addEventListener('blur', cancel);
+    D.addEventListener('visibilitychange', cancel);
+    return function (e) {
+      return e.pointerType === 'touch' || e.pointerType === 'pen' || (e.detail > 0 && touchInput);
+    };
+  }
+
   function buildBoard() {
     var board = q('board');
     board.innerHTML = '';
@@ -179,9 +222,11 @@
       board.appendChild(btn);
       cells.push(btn);
     }
+    var isTouchClick = bindTouchCellNotes(board);
+    var touchHintShown = false;
     board.addEventListener('click', function (e) {
       var noteToggle = e.target.closest ? e.target.closest('.cell-note-corner') : null;
-      if (noteToggle) {
+      if (noteToggle && !isTouchClick(e)) {
         e.preventDefault();
         e.stopPropagation();
         toggleHostCellNotes(parseInt(noteToggle.parentNode.getAttribute('data-i'), 10));
@@ -190,6 +235,10 @@
       var target = e.target.closest ? e.target.closest('.cell') : null;
       if (!target) return;
       selectCell(parseInt(target.getAttribute('data-i'), 10), true);
+      if (noteToggle && !touchHintShown) {
+        touchHintShown = true;
+        toast(tr('cell.noteHold'));
+      }
     });
   }
 
@@ -336,6 +385,7 @@
   /* ---------- 選格 ---------- */
   function selectCell(index, fromUser) {
     if (index < 0 || index >= 81) return;
+    hostNoteOpenIndex = -1;
     selected = index;
     renderBoard();
     if (cells[index]) cells[index].focus({ preventScroll: true });
@@ -1158,6 +1208,8 @@
     corner.setAttribute('aria-label', list.length
       ? tr('cell.noteViewN', { n: list.length })
       : tr('cell.noteViewNone'));
+    corner.setAttribute('title', el.closest('#board') && w.matchMedia('(any-pointer:coarse)').matches
+      ? tr('cell.noteHold') : corner.getAttribute('aria-label'));
     var popTitle = popover.querySelector('.cell-note-popover-title');
     if (popTitle) popTitle.textContent = tr('cell.noteTitle');
     popover.hidden = !open;

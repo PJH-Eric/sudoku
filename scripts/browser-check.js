@@ -435,7 +435,35 @@ async function main() {
     ));
     check('玩家點整格不會展開格子留言', noteChrome.playerClickOpens === false, JSON.stringify(noteChrome));
     check('每格都有右上角小型格子留言三角形且可展開', noteChrome.corners === 81 && noteChrome.size <= 18 && noteChrome.open, JSON.stringify(noteChrome));
-    await cdp.eval("document.querySelector('#board .cell .cell-note-corner').click(); return 1;");
+    await cdp.eval("document.querySelector('#board .cell').click(); return 1;");
+    if (v.mobile) {
+      await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+      const point = JSON.parse(await cdp.eval(
+        "var r=document.querySelector('#board .cell .cell-note-corner').getBoundingClientRect();" +
+        "return JSON.stringify({x:r.left+r.width/2,y:r.top+r.height/2});"
+      ));
+      async function touchCorner(duration, move) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+        if (move) {
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: point.x + 20, y: point.y + 20 }] });
+        }
+        await sleep(duration);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await sleep(120);
+        return JSON.parse(await cdp.eval(
+          "var cell=document.querySelector('#board .cell');" +
+          "return JSON.stringify({selected:cell.classList.contains('sel'),open:!cell.querySelector('.cell-note-popover').hidden});"
+        ));
+      }
+      const tap = await touchCorner(40, false);
+      check('觸控短按三角形只選格，不會誤開留言', tap.selected && !tap.open, JSON.stringify(tap));
+      const hold = await touchCorner(650, false);
+      check('觸控長按可查看留言，放開後不會被合成點擊關閉', hold.selected && hold.open, JSON.stringify(hold));
+      await cdp.eval("document.querySelector('#board .cell').click(); return 1;");
+      const moved = await touchCorner(650, true);
+      check('觸控滑動取消長按留言', !moved.open, JSON.stringify(moved));
+      await cdp.eval("document.querySelector('#board .cell').click(); return 1;");
+    }
     if (v.width === 390) {
       const seedBefore = await cdp.eval("return document.getElementById('g-seed').textContent;");
       await setViewport(VIEWPORTS[2]);
