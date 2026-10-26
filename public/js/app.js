@@ -75,6 +75,7 @@
 
   /* ---------- 畫面切換 ---------- */
   function go(id) {
+    if (w.ServerOutage) w.ServerOutage.setScreen(id);
     if (cur === 's-game' && id !== 's-game') stopTimer();
     if (cur === 's-lobby' && id !== 's-lobby') stopLobbyAuto();
     qa('.screen').forEach(function (s) { s.classList.toggle('active', s.id === id); });
