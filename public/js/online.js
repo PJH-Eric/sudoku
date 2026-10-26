@@ -117,6 +117,7 @@
     if (!url) return cb({ code: 'offline', message: disabledReason(), status: 0 }, null);
 
     var done = false;
+    if (w.ServerOutage) w.ServerOutage.state('begin');
     var controller = (typeof w.AbortController === 'function') ? new w.AbortController() : null;
     var timeout = setTimeout(function () {
       if (done) return;
@@ -144,6 +145,7 @@
       done = true;
       clearTimeout(timeout);
       if (wakeTimer) clearTimeout(wakeTimer);
+      if (w.ServerOutage && r.res.status < 500) w.ServerOutage.state('open');
       if (!r.data) {
         return cb({ code: 'badjson', message: T('err.badjson'), status: r.res.status }, null);
       }
@@ -189,6 +191,7 @@
     if (!session) return;
     if (session.state === next && next !== 'failed') return;
     session.state = next;
+    if (w.ServerOutage && next !== 'closed') w.ServerOutage.state(next);
     if (next !== 'open' && w.NetworkLatency) w.NetworkLatency.report(null);
     if (handlers.status) handlers.status(next, detail || '');
   }
@@ -348,6 +351,7 @@
   }
 
   function disconnect() {
+    if (w.ServerOutage) w.ServerOutage.state('idle');
     stopStatePush();
     latencyProbeInFlight = false;
     if (w.NetworkLatency) { w.NetworkLatency.setProbe(null); w.NetworkLatency.report(null); }
