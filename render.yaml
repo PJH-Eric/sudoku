@@ -10,7 +10,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
-        value: "20"
+        value: "26.12.1"
       # 允許連線的前端來源（例如 GitHub Pages 網址）；沒設定就是不限制。
       - key: GAME_ALLOWED_ORIGIN
         sync: false
