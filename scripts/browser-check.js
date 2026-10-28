@@ -196,6 +196,25 @@ const PAGE_HELPERS = `
       var value = selected.querySelector('.v').textContent;
       var peer = cells.find(function (cell) { return cell.classList.contains('peer') && !cell.classList.contains('same'); });
       var same = cells.find(function (cell) { return cell !== selected && cell.classList.contains('same'); });
+      var lineCell = cells.find(function (cell) {
+        return cell.classList.contains('peer') && !cell.classList.contains('br') && Number(cell.getAttribute('data-i')) % 9 !== 8;
+      });
+      var lineStyle = getComputedStyle(lineCell);
+      function luminance(color) {
+        var channels = color.slice(color.indexOf('(') + 1, color.indexOf(')')).split(',').slice(0, 3).map(function (channel) {
+          var value = Number(channel) / 255;
+          return value <= .04045 ? value / 12.92 : Math.pow((value + .055) / 1.055, 2.4);
+        });
+        return channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
+      }
+      function contrast(a, b) {
+        var x = luminance(a), y = luminance(b);
+        return (Math.max(x, y) + .05) / (Math.min(x, y) + .05);
+      }
+      var selectedStyle = getComputedStyle(selected);
+      var highlightContrasts = cells.filter(function (cell) {
+        return cell !== selected && (cell.classList.contains('peer') || cell.classList.contains('same'));
+      }).map(function (cell) { return contrast(lineStyle.borderRightColor, getComputedStyle(cell).backgroundColor); });
       return {
         index: index,
         peers: cells.filter(function (cell) { return cell.classList.contains('peer'); }).length,
@@ -211,6 +230,11 @@ const PAGE_HELPERS = `
         selectedCount: cells.filter(function (cell) { return cell.getAttribute('aria-selected') === 'true'; }).length,
         selectedBackground: getComputedStyle(selected).backgroundColor,
         selectedRing: getComputedStyle(selected).boxShadow,
+        gridContrast: Math.min.apply(null, highlightContrasts),
+        selectedRingContrast: contrast(selectedStyle.boxShadow, selectedStyle.backgroundColor),
+        thinLine: lineStyle.borderRightWidth,
+        boxVerticalLine: getComputedStyle(cells[2]).borderRightWidth,
+        boxHorizontalLine: getComputedStyle(cells[18]).borderBottomWidth,
         peerBackground: peer && getComputedStyle(peer).backgroundColor,
         sameBackground: same && getComputedStyle(same).backgroundColor
       };
@@ -421,8 +445,12 @@ async function main() {
       JSON.stringify(selection));
     check('選格提示沿用原色系，加深十字、九宮格與相同數字的背景',
       selection.selectedBackground === 'rgb(231, 194, 99)' && selection.peerBackground === 'rgb(227, 214, 245)' &&
-      selection.sameBackground === 'rgb(169, 231, 210)' && selection.selectedRing.includes('164, 143, 219'),
+      selection.sameBackground === 'rgb(169, 231, 210)' && selection.selectedRing.includes('110, 79, 191'),
       JSON.stringify(selection));
+    check('加深高亮背景後，細格線與選取外框仍有清楚對比',
+      selection.gridContrast >= 3 && selection.selectedRingContrast >= 3, JSON.stringify(selection));
+    check('保留 1px 細格線與 3px 九宮格粗線', selection.thinLine === '1px' &&
+      selection.boxVerticalLine === '3px' && selection.boxHorizontalLine === '3px', JSON.stringify(selection));
     await shot(v.name + '-選格高亮');
     await cdp.eval(
       "document.getElementById('b-settings').click();document.getElementById('settings-units').click();" +
