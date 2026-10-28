@@ -43,6 +43,9 @@
     'aria.help': ['玩法教學', 'How to play'],
 
     /* ---- 主選單 ---- */
+    'daily.title': ['📅 每日挑戰', '📅 Daily Challenge'],
+    'daily.date': ['日期：{date}（UTC）', 'Date: {date} (UTC)'],
+    'daily.note': ['每天 UTC 0 點更新，同一天同難度的題目相同。', 'A new puzzle every day at 00:00 UTC. The same date and difficulty give everyone the same puzzle.'],
     'home.lobbyLink': ['← 回遊戲大廳', '← Game Lobby'],
     'menu.continue': ['繼續上一題', 'Continue'],
     'menu.continueDiff': ['繼續上一題（{d}）', 'Continue ({d})'],
@@ -584,6 +587,9 @@
     "aria.result": "完成结算",
     "aria.stats": "我的纪录",
     "aria.help": "玩法教学",
+    "daily.title": "📅 每日挑战",
+    "daily.date": "日期：{date}（UTC）",
+    "daily.note": "每天 UTC 0 点更新，同一天同难度的题目相同。",
     "home.lobbyLink": "← 回游戏大厅",
     "menu.continue": "继续上一题",
     "menu.continueDiff": "继续上一题（{d}）",

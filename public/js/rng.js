@@ -69,9 +69,16 @@
     return list;
   }
 
+  /* 每日題目使用世界協調時間，跨時區也能分享同一題。 */
+  function dailySeed(date) {
+    var day = (date || new Date()).toISOString().slice(0, 10).replace(/-/g, '');
+    return 'D' + day.replace(/[0-9]/g, function (digit) { return '23456789AB'.charAt(Number(digit)); });
+  }
+
   w.RNG = {
     SEED_CHARS: SEED_CHARS,
     SEED_MAX: SEED_MAX,
+    dailySeed: dailySeed,
     hashSeed: hashSeed,
     createRng: createRng,
     normalizeSeed: normalizeSeed,

@@ -246,6 +246,14 @@ body{
 .home-btns{display:flex;flex-direction:column;gap:13px;align-items:stretch}
 .home-row{display:flex;gap:12px}
 .home-row .btn3d{flex:1}
+@media (min-width:601px) and (max-height:500px){
+  #s-home .home-wrap{max-width:calc(100% - 250px)}
+}
+.daily-challenge{margin-top:22px;padding:16px;border:2px solid var(--ink-soft);border-radius:18px}
+.daily-challenge h2{margin:0;font-size:1.15rem}
+.daily-challenge p{margin:6px 0;font-size:.85rem;line-height:1.5}
+.daily-buttons{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:12px}
+.daily-buttons .btn3d{min-height:44px}
 .home-note{margin:18px 6px 0;font-size:.86rem;color:var(--ink-soft);font-weight:700;line-height:1.6}
 
 /* ---------- 面板 ---------- */

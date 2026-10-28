@@ -32,6 +32,7 @@
   var padButtons = [];
   var pendingDifficulty = w.Store.loadLastDifficulty() || 'beginner';
   var tutStep = 0;
+  var pendingSeed = '';
 
   function diffLabel(d) { return S.PRESETS[d] ? tr('diff.' + d) : (d || ''); }
   function techName(name) { return S.techLabel ? S.techLabel(name) : (name || ''); }
@@ -93,7 +94,12 @@
     setTimeout(function () { w.UI.repaintAll(q(id)); }, 30);
   }
 
+  function refreshDailyDate() {
+    q('daily-date').textContent = tr('daily.date', { date: new Date().toISOString().slice(0, 10) });
+  }
+
   function refreshHome() {
+    refreshDailyDate();
     var saved = w.Store.loadGame();
     var btn = q('b-continue');
     if (saved && saved.status !== 'won') {
@@ -546,9 +552,10 @@
   function startNewGame(difficulty, seed, keepHostRoom) {
     var reuseRoom = !!keepHostRoom && !!host;
     if (host && !reuseRoom) {
+      var nextHostMode = hostMode;
       /* 換難度或從其他流程開新題目時，仍維持一間房只對應一題。 */
       endHostRoom(true);
-      hostMode = true;
+      hostMode = nextHostMode;
     }
     if (reuseRoom) {
       /* 換題期間先停掉舊題目的定時推送，避免把上一局快照送回伺服器。 */
@@ -557,6 +564,7 @@
       hostNoteOpenIndex = -1;
     }
     pendingDifficulty = difficulty;
+    pendingSeed = seed;
     w.Store.saveLastDifficulty(difficulty);
     q('loading-note').textContent = tr('loading.noteDiff', { d: diffLabel(difficulty) });
     go('s-loading');
@@ -2125,6 +2133,7 @@
 
   /* ---------- 綁定 ---------- */
   function bind() {
+    setInterval(function () { if (cur === 's-home') refreshDailyDate(); }, 30000);
     qa('[data-back]').forEach(function (b) {
       b.addEventListener('click', function () { w.Sound.play('click'); go(b.getAttribute('data-back')); });
     });
@@ -2135,6 +2144,13 @@
       setHostMode(w.Online.isEnabled());
       markDiff(pendingDifficulty);
       go('s-setup');
+    });
+    q('daily-buttons').addEventListener('click', function (e) {
+      var button = e.target.closest('[data-daily]');
+      if (!button) return;
+      w.Sound.play('click');
+      setHostMode(false);
+      startNewGame(button.getAttribute('data-daily'), w.RNG.dailySeed());
     });
     q('b-continue').addEventListener('click', function () { w.Sound.play('click'); continueSaved(); });
     q('b-stats').addEventListener('click', function () { w.Sound.play('click'); go('s-stats'); });
@@ -2161,7 +2177,7 @@
     });
     q('b-retry').addEventListener('click', function () {
       w.Sound.play('click');
-      startNewGame(pendingDifficulty, w.RNG.normalizeSeed(q('seed-input').value));
+      startNewGame(pendingDifficulty, pendingSeed);
     });
 
     q('b-quit').addEventListener('click', function () {

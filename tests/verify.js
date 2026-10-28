@@ -60,6 +60,19 @@ const RNG = sandbox.RNG;
 const S = sandbox.Sudoku;
 const G = sandbox.SudokuGame;
 
+ok('每日挑戰依 UTC 日期及難度固定出題，且每題只有一解', () => {
+  const first = RNG.dailySeed(new Date('2026-10-28T00:00:00Z'));
+  assert.strictEqual(first, RNG.normalizeSeed(first));
+  assert.strictEqual(first, RNG.dailySeed(new Date('2026-10-28T23:59:59Z')));
+  assert.notStrictEqual(first, RNG.dailySeed(new Date('2026-10-29T00:00:00Z')));
+  for (const difficulty of S.DIFFICULTIES) {
+    const a = S.generatePuzzle({ difficulty, seed: first });
+    const b = S.generatePuzzle({ difficulty, seed: first });
+    assert.deepStrictEqual(a.puzzle, b.puzzle);
+    assert.strictEqual(S.countSolutions(a.puzzle, 2).count, 1);
+  }
+});
+
 const html = read(path.join(publicDir, 'index.html'));
 const css = read(path.join(publicDir, 'css', 'style.css'));
 const appSource = read(path.join(publicDir, 'js', 'app.js'));

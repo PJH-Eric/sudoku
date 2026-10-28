@@ -828,6 +828,17 @@ async function main() {
   console.log('\n【主控台】');
   check('沒有未處理的主控台錯誤', consoleErrors.length === 0, consoleErrors.slice(0, 5).join(' | '));
 
+  /* 每日挑戰從主選單進入，依日期與難度開啟可重現的單機題目。 */
+  await goto(BASE);
+  await cdp.eval("document.querySelector('[data-daily=easy]').click(); return 1;");
+  const dailyReady = await waitForPage("document.getElementById('s-game').classList.contains('active')", 10000);
+  const dailyUi = JSON.parse(await cdp.eval(
+    "var saved=JSON.parse(localStorage.getItem('sudoku.game') || 'null');" +
+    "return JSON.stringify({seed:document.getElementById('g-seed').textContent," +
+    "expected:RNG.dailySeed(),host:!document.getElementById('hostbar').hidden});"
+  ));
+  check('每日挑戰從主選單開啟當日單機題目', dailyReady && dailyUi.seed.indexOf(dailyUi.expected) >= 0 && !dailyUi.host, JSON.stringify(dailyUi));
+
   /* ---------- server URL 參數化：單機／已連線／設定錯誤／連不上 ---------- */
   console.log('\n【server URL 參數化】');
   const readServerRow = "document.getElementById('b-settings').click();";
