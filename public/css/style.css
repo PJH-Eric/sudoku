@@ -875,6 +875,22 @@ body{
   #s-loading.active,#s-error.active{align-items:center}
 }
 
+/* 手機主選單：減少裝飾留白，讓每日挑戰更早出現在畫面中。 */
+@media (orientation:portrait) and (max-width:560px){
+  #s-home .home-wrap{padding:70px 14px 20px}
+  #s-home .logo{max-width:250px;margin-bottom:12px}
+  #s-home .home-btns{gap:8px}
+  #s-home .home-row{gap:8px}
+  #s-home .home-btns > .btn3d{min-height:54px;padding:10px 18px calc(10px + var(--d))}
+  #s-home .home-row .btn3d{min-width:0;min-height:48px;padding:8px 10px calc(8px + var(--d))}
+  #s-home .daily-challenge{margin-top:14px;padding:11px 10px}
+  #s-home .daily-challenge h2{font-size:1.05rem}
+  #s-home .daily-challenge p{margin:4px 0;font-size:.8rem}
+  #s-home .daily-buttons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}
+  #s-home .daily-buttons .btn3d{min-width:0;min-height:48px;padding:7px 4px calc(7px + var(--d))}
+  #s-home .home-note{margin-top:12px}
+}
+
 /* 極矮視窗：允許遊戲畫面捲動，不要硬擠 */
 @media (max-height:420px) and (orientation:portrait){
   #s-game.active{overflow-y:auto}
