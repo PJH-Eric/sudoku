@@ -187,6 +187,33 @@ const PAGE_HELPERS = `
         noteCorner: Math.max.apply(null, Array.prototype.map.call(b.querySelectorAll('.cell-note-corner'), function (el) { return Math.max(el.getBoundingClientRect().width, el.getBoundingClientRect().height); }))
       };
     },
+    selection: function () {
+      var cells = Array.from(document.querySelectorAll('#board .cell'));
+      var selected = document.querySelector('#board .cell.sel');
+      var index = Number(selected.getAttribute('data-i'));
+      var row = Math.floor(index / 9), col = index % 9;
+      var value = selected.querySelector('.v').textContent;
+      var peer = cells.find(function (cell) { return cell.classList.contains('peer') && !cell.classList.contains('same'); });
+      var same = cells.find(function (cell) { return cell !== selected && cell.classList.contains('same'); });
+      return {
+        index: index,
+        peers: cells.filter(function (cell) { return cell.classList.contains('peer'); }).length,
+        correctPeers: cells.every(function (cell, i) {
+          var r = Math.floor(i / 9), c = i % 9;
+          var expected = i !== index && (r === row || c === col ||
+            (Math.floor(r / 3) === Math.floor(row / 3) && Math.floor(c / 3) === Math.floor(col / 3)));
+          return cell.classList.contains('peer') === expected;
+        }),
+        correctSame: cells.every(function (cell) {
+          return cell.classList.contains('same') === (!!value && cell.querySelector('.v').textContent === value);
+        }),
+        selectedCount: cells.filter(function (cell) { return cell.getAttribute('aria-selected') === 'true'; }).length,
+        selectedBackground: getComputedStyle(selected).backgroundColor,
+        selectedRing: getComputedStyle(selected).boxShadow,
+        peerBackground: peer && getComputedStyle(peer).backgroundColor,
+        sameBackground: same && getComputedStyle(same).backgroundColor
+      };
+    },
     click: function (sel) {
       var el = document.querySelector(sel);
       if (!el) return false;
@@ -376,6 +403,37 @@ async function main() {
     check('暫停按鈕放在計時器旁邊且維持觸控尺寸', gameControls.pauseInTimer && gameControls.pauseWidth >= 40 && gameControls.pauseHeight >= 40,
       JSON.stringify(gameControls));
     check('單機遊戲不顯示房間資訊入口', gameControls.roomInfoHidden, JSON.stringify(gameControls));
+    await cdp.eval(
+      "var givens=Array.from(document.querySelectorAll('#board .cell.given'));" +
+      "var selected=givens.find(function(cell){return cell.querySelector('.v').textContent==='4';}) || givens[0];" +
+      "selected.click(); return 1;"
+    );
+    await sleep(180);
+    const selection = JSON.parse(await cdp.eval('return JSON.stringify(window.__probe.selection());'));
+    check('選格會準確標示同列、同行與同宮的 20 個相關格', selection.peers === 20 && selection.correctPeers,
+      JSON.stringify(selection));
+    check('相同數字完整高亮，選取格有唯一無障礙選取狀態', selection.correctSame && selection.selectedCount === 1,
+      JSON.stringify(selection));
+    check('選格提示沿用原色系，加深十字、九宮格與相同數字的背景',
+      selection.selectedBackground === 'rgb(231, 194, 99)' && selection.peerBackground === 'rgb(227, 214, 245)' &&
+      selection.sameBackground === 'rgb(169, 231, 210)' && selection.selectedRing.includes('164, 143, 219'),
+      JSON.stringify(selection));
+    await shot(v.name + '-選格高亮');
+    await cdp.eval(
+      "document.getElementById('b-settings').click();document.getElementById('settings-units').click();" +
+      "document.getElementById('settings-same').click();document.getElementById('settings-close').click();return 1;"
+    );
+    const disabledHighlights = JSON.parse(await cdp.eval(
+      "return JSON.stringify({peer:document.querySelectorAll('#board .peer').length," +
+      "same:document.querySelectorAll('#board .same').length,selected:document.querySelectorAll('#board [aria-selected=\"true\"]').length});"
+    ));
+    check('關閉高亮設定後不標示相關格與同數字，仍保留選取框',
+      disabledHighlights.peer === 0 && disabledHighlights.same === 0 && disabledHighlights.selected === 1,
+      JSON.stringify(disabledHighlights));
+    await cdp.eval(
+      "document.getElementById('b-settings').click();document.getElementById('settings-units').click();" +
+      "document.getElementById('settings-same').click();document.getElementById('settings-close').click();return 1;"
+    );
     check('盤面有 81 格且是正方形', boardInfo.cells === 81 && Math.abs(boardInfo.width - boardInfo.height) <= 2,
       JSON.stringify(boardInfo));
     check('盤面完整在畫面內', boardInfo.left >= -1 && boardInfo.right <= info.vw + 1 && boardInfo.width >= 180,

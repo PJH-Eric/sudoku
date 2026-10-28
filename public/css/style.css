@@ -341,8 +341,8 @@ body{
 .cell .v{font-size:calc(var(--bs,320px) / 9 * .62);font-weight:800;line-height:1;pointer-events:none}
 .cell.given{background:#F3EEFA;color:var(--ink)}
 .cell.given .v{font-weight:900}
-.cell.peer{background:#FBF7FF}
-.cell.same{background:#DFF6EC}
+.cell.peer{background:#E3D6F5}
+.cell.same{background:var(--mint)}
 .cell.conflict{background:var(--danger-bg);color:var(--danger)}
 .cell.wrong{background:var(--danger-bg);color:var(--danger)}
 .cell.wrong .v{text-decoration:underline wavy var(--danger)}

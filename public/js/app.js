@@ -293,6 +293,7 @@
       if (wrong && wrong[i]) cls += ' wrong';
       el.className = cls;
       el.tabIndex = (i === selected) ? 0 : -1;
+      el.setAttribute('aria-selected', i === selected ? 'true' : 'false');
 
       var value = el.querySelector('.v');
       value.textContent = v ? String(v) : '';
