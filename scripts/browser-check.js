@@ -177,6 +177,7 @@ const PAGE_HELPERS = `
         cells: b.querySelectorAll('.cell').length,
         width: Math.round(r.width), height: Math.round(r.height),
         left: Math.round(r.left), right: Math.round(r.right),
+        statsLeft: document.querySelector('#s-game .statbar > .stat').getBoundingClientRect().left,
         top: Math.round(r.top), bottom: Math.round(r.bottom),
         cell: Math.round(cell.width * 10) / 10,
         room: Math.round(room),
@@ -395,6 +396,10 @@ async function main() {
     screensToCheck.push(['遊戲中', info]);
     check('出題後停在遊戲畫面', info.activeScreen === 's-game', info.activeScreen);
     const boardInfo = JSON.parse(await cdp.eval('return JSON.stringify(window.__probe.board());'));
+    if (v.width > v.height && v.height > 520) {
+      check('寬版統計列與棋盤左緣對齊', Math.abs(boardInfo.statsLeft - boardInfo.left) <= 1,
+        JSON.stringify(boardInfo));
+    }
     const gameControls = JSON.parse(await cdp.eval(
       "var pause=document.getElementById('b-pause'); var roomInfo=document.getElementById('b-room-info');" +
       "return JSON.stringify({pauseInTimer:!!pause.closest('.stat-time'),roomInfoHidden:roomInfo.hidden," +

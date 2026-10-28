@@ -887,6 +887,12 @@ body{
 #s-game .statbar > .stat:nth-child(2){background:#F6F0FF}
 #s-game .statbar > .stat:nth-child(3){background:#FFF9EA}
 #s-game .statbar > .stat:nth-child(4){background:#FFF0F3}
+@media (orientation:landscape) and (min-height:521px){
+  #s-game .statbar{
+    max-width:min(800px,calc(100% - var(--board-left,12px) - 12px));
+    margin-left:var(--board-left,12px);padding-left:0;padding-right:0;
+  }
+}
 @media (max-width:599px){
   #s-game .stat-time > .k{display:none}
   #s-game .statbar .stat-action-label{display:none}

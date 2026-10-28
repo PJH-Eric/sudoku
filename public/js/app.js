@@ -382,7 +382,14 @@
     var size = Math.max(180, Math.floor(Math.min(w1, h1)) - 2);
     board.style.setProperty('--bs', size + 'px');
   }
-  function resizeBoard() { resizeBoardIn('s-game', 'board'); }
+  function resizeBoard() {
+    resizeBoardIn('s-game', 'board');
+    var screen = q('s-game');
+    if (!screen || !screen.classList.contains('active')) return;
+    var boardLeft = q('board').getBoundingClientRect().left;
+    var topLeft = screen.querySelector('.gtop').getBoundingClientRect().left;
+    screen.style.setProperty('--board-left', Math.max(0, boardLeft - topLeft) + 'px');
+  }
 
   /* ---------- 選格 ---------- */
   function selectCell(index, fromUser) {
