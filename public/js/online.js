@@ -26,6 +26,8 @@
   var STATE_KEEPALIVE_MS = 3000;    // 沒有操作時也定期推一次，讓觀戰者的計時跟得上
 
   var session = null;   // { code, role, token, viewerId, name, es, retries, state }
+  var lobbySource = null;
+  var lobbyHandler = null;
   var handlers = {};
   var pendingSnapshot = null;
   var stateTimer = null;
@@ -102,6 +104,31 @@
 
   function apiUrl(path) { return C ? C.url(path) : null; }
 
+  function watchLobby(onOnline) {
+    lobbyHandler = onOnline || null;
+    if (!isEnabled() || typeof w.EventSource !== 'function') return false;
+    if (lobbySource) return true;
+    var source = new w.EventSource(apiUrl('/api/lobby/stream'));
+    lobbySource = source;
+    source.addEventListener('online', function (event) {
+      if (lobbySource !== source) return;
+      var data = null;
+      try { data = JSON.parse(event.data); } catch (e) { /* Ignore malformed server events. */ }
+      if (lobbyHandler) lobbyHandler(data && Number.isInteger(data.online) && data.online >= 0 ? data.online : null);
+    });
+    source.addEventListener('error', function () {
+      if (lobbySource === source && lobbyHandler) lobbyHandler(null);
+    });
+    return true;
+  }
+
+  function stopLobbyWatch() {
+    lobbyHandler = null;
+    if (!lobbySource) return;
+    try { lobbySource.close(); } catch (e) { /* Already closed. */ }
+    lobbySource = null;
+  }
+
   function friendlyNetworkError() {
     return T('err.network');
   }
@@ -170,7 +197,7 @@
   function listRooms(cb, onWaking) {
     request('GET', '/api/rooms', null, function (err, data) {
       if (err) return cb(err, null);
-      cb(null, { rooms: data.rooms || [], maxRooms: data.maxRooms || 0 });
+      cb(null, { rooms: data.rooms || [], maxRooms: data.maxRooms || 0, online: data.online });
     }, onWaking);
   }
 
@@ -351,6 +378,7 @@
   }
 
   function disconnect() {
+    stopLobbyWatch();
     if (w.ServerOutage) w.ServerOutage.state('idle');
     stopStatePush();
     latencyProbeInFlight = false;
@@ -472,6 +500,8 @@
     isEnabled: isEnabled,
     disabledReason: disabledReason,
     listRooms: listRooms,
+    watchLobby: watchLobby,
+    stopLobbyWatch: stopLobbyWatch,
     roomInfo: roomInfo,
     createRoom: createRoom,
     connect: connect,

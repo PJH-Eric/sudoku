@@ -2,8 +2,7 @@
  * scripts/online-check.js — 啟動真實 HTTP 伺服器，驗證主持人／觀戰者流程。
  * 執行：npm run test:online
  *
- * 使用兩個獨立 SSE 用戶端，不依賴瀏覽器或外部套件，檢查：
- *   開房 → 主持人／多位觀戰者連線 → 盤面廣播 → 格子留言 → 聊天 → 邀請撤銷 → 關房通知。
+ * 使用獨立 SSE 用戶端，不依賴瀏覽器或外部套件，檢查在線人數與主持人／觀戰者流程。
  */
 'use strict';
 
@@ -139,6 +138,10 @@ async function openSse(url) {
 
 async function main() {
   while (!server.listening) await sleep(10);
+  const lobby = await openSse(base + '/api/lobby/stream');
+  assert.strictEqual((await lobby.waitFor('online')).online, 1, '線上大廳 SSE 應計入目前連線');
+  const roomsBefore = await jsonRequest(base + '/api/rooms');
+  assert.strictEqual(roomsBefore.data.online, 1, '房間列表應回傳大廳與房間的在線人數');
   const initial = makeSnapshot();
   const created = await jsonRequest(base + '/api/rooms', {
     method: 'POST',
@@ -153,8 +156,11 @@ async function main() {
 
   const room = created.data;
   const host = await openSse(base + '/api/rooms/' + room.code + '/stream?token=' + encodeURIComponent(room.hostToken));
+  assert.strictEqual((await lobby.waitFor('online', (data) => data.online === 2)).online, 2, '主持人進房後在線人數應增加');
   const viewer = await openSse(base + '/api/rooms/' + room.code + '/stream?name=' + encodeURIComponent('觀戰者甲') + '&invite=' + encodeURIComponent(room.inviteToken));
+  assert.strictEqual((await lobby.waitFor('online', (data) => data.online === 3)).online, 3, '觀戰者進房後在線人數應增加');
   const viewer2 = await openSse(base + '/api/rooms/' + room.code + '/stream?name=' + encodeURIComponent('觀戰者乙') + '&invite=' + encodeURIComponent(room.inviteToken));
+  assert.strictEqual((await lobby.waitFor('online', (data) => data.online === 4)).online, 4, '第二位觀戰者進房後在線人數應增加');
   const [hostWelcome, viewerWelcome, viewer2Welcome] = await Promise.all([
     host.waitFor('welcome'), viewer.waitFor('welcome'), viewer2.waitFor('welcome')
   ]);
@@ -269,6 +275,7 @@ async function main() {
   host.close();
   viewer.close();
   viewer2.close();
+  lobby.close();
   console.log('線上端到端檢查全部通過（主持人＋多位觀戰者 SSE、盤面、格子留言、聊天、邀請撤銷、關房）。');
 }
 

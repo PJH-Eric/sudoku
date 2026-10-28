@@ -78,7 +78,12 @@
   function go(id) {
     if (w.ServerOutage) w.ServerOutage.setScreen(id);
     if (cur === 's-game' && id !== 's-game') stopTimer();
-    if (cur === 's-lobby' && id !== 's-lobby') stopLobbyAuto();
+    if (cur === 's-lobby' && id !== 's-lobby') {
+      stopLobbyAuto();
+      w.Online.stopLobbyWatch();
+      lobbyOnlineCount = null;
+      paintLobbyOnlineCount();
+    }
     qa('.screen').forEach(function (s) { s.classList.toggle('active', s.id === id); });
     cur = id;
     if (w.NetworkLatency) w.NetworkLatency.setActive((id === 's-game' && hostMode && state && state.status === 'playing') || (id === 's-watch' && !!(watch && watch.view && watch.view.status === 'playing')));
@@ -784,6 +789,13 @@
 
   /* ---------- 大廳 ---------- */
   var lobbyMsg = null;   // 以 key 設定的狀態列文字，切換語言時重畫
+  var lobbyOnlineCount = null;
+  function paintLobbyOnlineCount() {
+    var el = q('lobby-online-count');
+    if (!el) return;
+    el.hidden = !Number.isInteger(lobbyOnlineCount) || cur !== 's-lobby' || !w.Online.isEnabled();
+    el.textContent = Number.isInteger(lobbyOnlineCount) ? tr('lobby.onlineCount', { n: lobbyOnlineCount }) : '';
+  }
   function setLobbyState(kind, text, key, params) {
     var el = q('lobby-state');
     if (!el) return;
@@ -800,9 +812,16 @@
     if (!on) {
       q('lobby-off-note').textContent = w.Online.disabledReason();
       stopLobbyAuto();
+      w.Online.stopLobbyWatch();
+      lobbyOnlineCount = null;
+      paintLobbyOnlineCount();
       return;
     }
     q('lobby-nick').value = nick;
+    w.Online.watchLobby(function (count) {
+      lobbyOnlineCount = count;
+      paintLobbyOnlineCount();
+    });
     refreshLobby();
     startLobbyAuto();
   }
@@ -824,9 +843,15 @@
       if (cur !== 's-lobby') return;
       if (err) {
         setLobbyState('error', err.message);
+        lobbyOnlineCount = null;
+        paintLobbyOnlineCount();
         renderRooms(null);
         return;
       }
+      if (lobbyOnlineCount === null) {
+        lobbyOnlineCount = Number.isInteger(data.online) && data.online >= 0 ? data.online : null;
+      }
+      paintLobbyOnlineCount();
       renderRooms(data.rooms);
       setLobbyKey('ok', 'lobby.count', { n: data.rooms.length, max: data.maxRooms });
     }, function () {

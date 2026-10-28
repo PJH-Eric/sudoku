@@ -16,6 +16,7 @@
  * 端點：
  *   GET  /health                      健康檢查（雲端平台與前端用）
  *   GET  /api/rooms                   公開房間列表
+ *   GET  /api/lobby/stream             SSE：大廳及房間的在線人數
  *   POST /api/rooms                   開房（回房號與 hostToken）
  *   GET  /api/rooms/:code             單一房間資訊（加入前先確認房間還在）
  *   GET  /api/rooms/:code/stream      SSE：state / note / chat / presence / closed / 心跳
@@ -128,6 +129,13 @@ function readJson(req, cb) {
 
 /* ---------- SSE 用戶端登記簿 ---------- */
 const clients = new Map();   // 房號 -> Set of client
+const lobbyClients = new Set();
+
+function onlineCount() {
+  let count = lobbyClients.size;
+  clients.forEach((set) => { count += set.size; });
+  return count;
+}
 
 function addClient(code, client) {
   let set = clients.get(code);
@@ -155,6 +163,11 @@ function broadcast(code, event, data, id) {
   set.forEach((client) => writeEvent(client, event, data, id));
 }
 
+function broadcastLobbyOnline() {
+  const data = { online: onlineCount() };
+  lobbyClients.forEach((client) => writeEvent(client, 'online', data));
+}
+
 store.on((evt) => {
   if (evt.type === 'state') broadcast(evt.code, 'state', evt.payload, evt.payload.version);
   else if (evt.type === 'note') broadcast(evt.code, 'note', evt.payload, 'n' + evt.payload.version);
@@ -166,6 +179,7 @@ store.on((evt) => {
     if (set) {
       set.forEach((client) => { client.closedByServer = true; try { client.res.end(); } catch (e) {} });
       clients.delete(evt.code);
+      broadcastLobbyOnline();
     }
   }
 });
@@ -175,6 +189,9 @@ setInterval(() => {
   clients.forEach((set) => set.forEach((client) => {
     try { client.res.write(': ping\n\n'); } catch (e) {}
   }));
+  lobbyClients.forEach((client) => {
+    try { client.res.write(': ping\n\n'); } catch (e) {}
+  });
 }, Math.min(HEARTBEAT_MS, SWEEP_MS)).unref();
 
 /* ---------- 路由 ---------- */
@@ -185,6 +202,12 @@ function handleApi(req, res, urlPath, query) {
     return sendJson(req, res, 403, { ok: false, code: 'origin', message: '這個來源不在伺服器允許的名單裡（GAME_ALLOWED_ORIGIN）。', msgKey: 'srv.origin' });
   }
 
+  if (urlPath === '/api/lobby/stream') {
+    if (req.method === 'OPTIONS') return preflight(req, res, 'GET, OPTIONS');
+    if (req.method !== 'GET') return sendJson(req, res, 405, { ok: false, message: '不支援的方法。', msgKey: 'srv.method' });
+    return openLobbyStream(req, res);
+  }
+
   /* --- 房間列表／開房 --- */
   if (urlPath === '/api/rooms') {
     if (req.method === 'OPTIONS') return preflight(req, res, 'GET, POST, OPTIONS');
@@ -192,6 +215,7 @@ function handleApi(req, res, urlPath, query) {
       return sendJson(req, res, 200, {
         ok: true,
         rooms: store.listRooms(),
+        online: onlineCount(),
         maxRooms: store.config.maxRooms,
         serverTime: Date.now()
       });
@@ -280,6 +304,7 @@ function openStream(req, res, code, query) {
     closedByServer: false
   };
   addClient(code, client);
+  broadcastLobbyOnline();
 
   writeEvent(client, 'welcome', {
     code: code,
@@ -303,9 +328,38 @@ function openStream(req, res, code, query) {
     if (closed) return;
     closed = true;
     dropClient(code, client);
+    broadcastLobbyOnline();
     if (client.closedByServer) return;
     if (asHost) store.detachHost(code, query.token);
     else if (client.viewerId) store.removeViewer(code, client.viewerId);
+  }
+  req.on('close', cleanup);
+  req.on('error', cleanup);
+  res.on('close', cleanup);
+}
+
+function openLobbyStream(req, res) {
+  res.writeHead(200, corsHead(req, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-store, no-transform',
+    'Content-Encoding': 'identity',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  }));
+  res.write(': 連線建立\n\n');
+  res.write('retry: 3000\n\n');
+
+  const client = { res: res };
+  lobbyClients.add(client);
+  writeEvent(client, 'online', { online: onlineCount() });
+  broadcastLobbyOnline();
+
+  let closed = false;
+  function cleanup() {
+    if (closed) return;
+    closed = true;
+    lobbyClients.delete(client);
+    broadcastLobbyOnline();
   }
   req.on('close', cleanup);
   req.on('error', cleanup);
