@@ -164,6 +164,12 @@ body{
 .room-info-body::-webkit-scrollbar-track{background:transparent;margin:6px 0}
 .room-info-body::-webkit-scrollbar-thumb{background:var(--grape);border:2px solid var(--ink);border-radius:999px}
 .room-info-note{margin:0 0 12px;padding:10px 12px;background:#F6F0FF;border:2px solid var(--line);border-radius:14px;color:var(--ink-soft);font-size:.82rem;font-weight:700;line-height:1.55;text-align:center}
+.peek-panel{width:min(94vw,460px)}
+.peek-grid{display:grid;grid-template-columns:repeat(9,1fr);width:100%;max-width:400px;margin:0 auto;border:3px solid var(--ink);border-radius:10px;overflow:hidden;background:#fff}
+.peek-cell{display:flex;align-items:center;justify-content:center;aspect-ratio:1;font-size:clamp(.95rem,4.6vw,1.4rem);font-weight:800;color:var(--grape-d);border:1px solid var(--line)}
+.peek-cell.given{background:#ECE6F3;color:var(--ink)}
+.peek-cell.cr{border-right:2px solid var(--ink)}
+.peek-cell.cb{border-bottom:2px solid var(--ink)}
 .room-info-body .hostbar{padding:0;justify-content:flex-start;align-items:stretch;gap:9px}
 .room-info-body .host-codebox{flex:1 1 100%;justify-content:center}
 .room-info-body .hostbar > .chip{display:inline-flex;align-items:center}
@@ -392,7 +398,7 @@ body{
 
 /* 數字盤與工具列 */
 .padwrap{display:flex;flex-direction:column;gap:8px;flex:0 0 auto;padding-bottom:2px}
-.tools{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+.tools{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
 .tools .btn3d{min-height:52px;padding:7px 6px calc(7px + var(--d));font-size:.82rem;--d:6px}
 .tools .btn3d .b3-lbl{flex-direction:column;gap:1px}
 .tools .ico{font-size:1.15rem;line-height:1}

@@ -27,6 +27,7 @@
   var settingsHistory = false;
   var roomInfoLastFocus = null;
   var roomInfoHistory = false;
+  var peekLastFocus = null;
   var pauseLastFocus = null;
   var cells = [];
   var padButtons = [];
@@ -2078,6 +2079,54 @@
     });
   }
 
+  function setPeekOpen(open) {
+    var modal = q('peek-modal');
+    var trigger = q('b-peek');
+    if (open) {
+      if (!state || !state.solution || modal.classList.contains('open')) return;
+      var grid = q('peek-grid');
+      grid.textContent = '';
+      for (var i = 0; i < 81; i++) {
+        var c = D.createElement('div');
+        var r = Math.floor(i / 9), col = i % 9;
+        c.className = 'peek-cell' + (state.given[i] ? ' given' : '') +
+          (col % 3 === 2 && col < 8 ? ' cr' : '') + (r % 3 === 2 && r < 8 ? ' cb' : '');
+        c.textContent = String(state.solution[i]);
+        grid.appendChild(c);
+      }
+      peekLastFocus = D.activeElement;
+    }
+    modal.classList.toggle('open', !!open);
+    modal.setAttribute('aria-hidden', open ? 'false' : 'true');
+    trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) q('peek-panel').focus();
+    else {
+      var back = peekLastFocus && typeof peekLastFocus.focus === 'function' ? peekLastFocus : trigger;
+      back.focus();
+      peekLastFocus = null;
+    }
+  }
+  function isPeekOpen() { return q('peek-modal').classList.contains('open'); }
+
+  function bindPeek() {
+    q('b-peek').addEventListener('click', function () { w.Sound.play('click'); setPeekOpen(true); });
+    q('peek-close').addEventListener('click', function () { w.Sound.play('click'); setPeekOpen(false); });
+    qa('[data-peek-close]').forEach(function (el) {
+      el.addEventListener('click', function () { setPeekOpen(false); });
+    });
+    q('peek-modal').addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab') return;
+      var list = focusableIn(q('peek-panel'));
+      if (!list.length) return;
+      var first = list[0], last = list[list.length - 1];
+      if (e.shiftKey && (D.activeElement === first || D.activeElement === q('peek-panel'))) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && D.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    });
+  }
+
   function bindSettings() {
     q('b-settings').addEventListener('click', function () { w.Sound.play('click'); setSettingsOpen(true); });
     q('settings-close').addEventListener('click', function () { w.Sound.play('click'); setSettingsOpen(false); });
@@ -2276,6 +2325,10 @@
         if (e.key === 'Escape') { e.preventDefault(); setRoomInfoOpen(false); }
         return;
       }
+      if (isPeekOpen()) {
+        if (e.key === 'Escape') { e.preventDefault(); setPeekOpen(false); }
+        return;
+      }
       /* 在留言板或任何文字欄位打字時，不可以把按鍵當成盤面操作 */
       var ae = D.activeElement;
       if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) {
@@ -2432,6 +2485,7 @@
     bind();
     bindSettings();
     bindRoomInfo();
+    bindPeek();
     bindOnline();
     applyOptions();
     markDiff(pendingDifficulty);

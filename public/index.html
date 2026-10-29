@@ -331,6 +331,7 @@
           <button class="btn3d small tool" data-color="cream" id="b-undo" type="button"><span class="ico">↶</span><span class="tx" data-i18n="tool.undo">復原</span></button>
           <button class="btn3d small tool" data-color="cream" id="b-redo" type="button"><span class="ico">↷</span><span class="tx" data-i18n="tool.redo">重做</span></button>
           <button class="btn3d small tool" data-color="lemon" id="b-hint" type="button"><span class="ico">💡</span><span class="tx" data-i18n="tool.hint">提示</span></button>
+          <button class="btn3d small tool" data-color="grape" id="b-peek" type="button" aria-haspopup="dialog" aria-controls="peek-modal" aria-expanded="false"><span class="ico">👀</span><span class="tx" data-i18n="tool.peek">偷看答案</span></button>
         </div>
         <div class="numpad" id="numpad" role="group" aria-label="數字輸入盤" data-i18n-attr="aria-label=aria.numpad"></div>
       </div>
@@ -364,6 +365,23 @@
             <button class="btn3d small" data-color="cream" id="b-reinvite"><span data-i18n="room.reinvite">↻ 換連結</span></button>
             <button class="btn3d small" data-color="cream" id="b-close-room"><span data-i18n="room.close">關閉房間</span></button>
           </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 偷看答案：沿用房間資訊彈窗的外觀，列出本題完整解答。 -->
+    <div class="room-info-modal" id="peek-modal" role="dialog" aria-modal="true"
+         aria-labelledby="peek-title" aria-hidden="true">
+      <div class="room-info-backdrop" data-peek-close></div>
+      <section class="room-info-panel peek-panel" id="peek-panel" tabindex="-1">
+        <div class="room-info-head">
+          <span class="room-info-badge" aria-hidden="true">👀</span>
+          <h2 id="peek-title" data-i18n="peek.title">完整答案</h2>
+          <button class="room-info-close" id="peek-close" type="button" aria-label="關閉完整答案" data-i18n-attr="aria-label=peek.closeAria">✕</button>
+        </div>
+        <div class="room-info-body" id="peek-body">
+          <p class="room-info-note" data-i18n="peek.note">灰底是題目給的數字，其餘是答案。</p>
+          <div class="peek-grid" id="peek-grid" role="table" aria-label="完整答案" data-i18n-attr="aria-label=peek.title"></div>
         </div>
       </section>
     </div>
