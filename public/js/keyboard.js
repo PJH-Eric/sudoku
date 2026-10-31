@@ -1,20 +1,18 @@
 /*
- * keyboard.js — 手機／平板軟體鍵盤修正（聊天室輸入框不再被鍵盤蓋住）
+ * keyboard.js — 手機／平板軟體鍵盤修正
  *
  * 【問題】
  * 遊戲版面是滿版固定高度（body 設 overflow:hidden、#app 高度 100dvh），
  * 但手機瀏覽器彈出軟體鍵盤時不一定會縮小版面：
  *   - iOS Safari：完全不縮版面，只是把鍵盤疊在畫面下半部
  *   - Android Chrome：預設只縮 visual viewport，版面高度不變
- * 於是位在底部的聊天室輸入框會被鍵盤整條蓋住，而畫面又沒有可捲動空間，
+ * 於是輸入欄位可能會被鍵盤蓋住，而畫面又沒有可捲動空間，
  * 使用者點了輸入框卻看不到自己打的字，感覺就像「手機上沒辦法打字」。
  *
  * 【做法】
  * 用 visualViewport 量出真正看得到的高度與鍵盤遮住的高度，寫成 CSS 變數：
  *   --app-h  目前真正可見的高度（樣式拿它當滿版高度；沒有鍵盤時不設定）
- *   --kb     鍵盤遮住的高度（沒有鍵盤時為 0px）
- * 同時在 <body> 掛上 kb-open，讓固定定位（position:fixed）的聊天面板可以
- * 往上讓開。輸入框聚焦後再分次把它捲進可見範圍，舊版瀏覽器沒有
+ * 輸入框聚焦後再分次把它捲進可見範圍，舊版瀏覽器沒有
  * visualViewport 時這層也還能保底。
  *
  * 【使用】
@@ -69,13 +67,8 @@
     pending = 0;
     /* 只有在打字時才縮版面，避免單純捲動或縮放時版面亂跳 */
     var kb = isTextField(d.activeElement) ? keyboardHeight() : 0;
-    root.style.setProperty('--kb', kb + 'px');
     if (kb) root.style.setProperty('--app-h', visibleHeight() + 'px');
     else root.style.removeProperty('--app-h');
-    if (d.body) {
-      if (kb) d.body.classList.add('kb-open');
-      else d.body.classList.remove('kb-open');
-    }
     return kb;
   }
 

@@ -5,7 +5,7 @@
  * 檢查：
  *   1. 兩種語言的 key 集合完全相同，且每個值都不是空字串
  *   2. 兩種語言的 {參數} 名稱一致
- *   3. 原始碼（HTML、前端 JS、伺服器回應）用到的 key 都存在於字典
+ *   3. 原始碼（HTML 與前端 JS）用到的 key 都存在於字典
  *   4. 英文字典不得含中文字（語言切換提示 lang.switchTo 會寫出「繁體中文」，除外）
  */
 'use strict';
@@ -56,7 +56,7 @@ ok('英文字典沒有殘留中文字', () => {
 ok('原始碼用到的 key 都存在於字典', () => {
   const used = new Map();
   const add = (k, f) => { if (!used.has(k)) used.set(k, f); };
-  const files = ['public/index.html', 'server.js', 'lib/rooms.js']
+  const files = ['public/index.html', 'server.js']
     .concat(fs.readdirSync(path.join(root, 'public/js')).filter((f) => f.endsWith('.js') && !/^(locales|i18n)\.js$/.test(f)).map((f) => 'public/js/' + f));
   files.forEach((f) => {
     const src = read(f);
@@ -76,16 +76,6 @@ ok('原始碼用到的 key 都存在於字典', () => {
   /* 動態組 key（例如 'tut.' + n）只檢查前綴底下有字典項目 */
   const missing = [...used].filter(([k]) => (k.endsWith('.') ? !Object.keys(zh).some((z) => z.indexOf(k) === 0) : !(k in zh))).map(([k, f]) => k + '（' + f + '）');
   assert.deepStrictEqual(missing, [], '字典缺少這些 key');
-});
-
-ok('伺服器的每個錯誤訊息都帶有字典 key', () => {
-  ['server.js', 'lib/rooms.js'].forEach((f) => {
-    read(f).split('\n').forEach((line, i) => {
-      if (/message: '[^']*[一-鿿]/.test(line) && f !== 'server.js' || /ok: false.*message: '/.test(line)) {
-        assert.ok(/msgKey: 'srv\.\w+'/.test(line), f + ':' + (i + 1) + ' 的錯誤訊息沒有 msgKey');
-      }
-    });
-  });
 });
 
 console.log('\ni18n 檢查全部通過（' + passed + ' 組，' + Object.keys(zh).length + ' 個 key）。');

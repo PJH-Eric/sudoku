@@ -8,10 +8,7 @@
  *   - 六種尺寸／方向下：不可水平溢出、右上角設定按鈕在安全區內且夠大、按鈕命中區足夠
  *   - 完整一局：選難度 → 出題 → 點格子填數字 → 暫停 → 繼續 → 解到勝利 → 結算
  *   - 設定彈窗：開啟、焦點、Escape 關閉、焦點歸位、靜音設定會被保存
- *   - 每格右上角格子留言三角形可以展開留言區
- *   - 線上觀戰者可以輸入格子留言，且不會出現數字輸入／遊戲提示
  *   - 重新載入後可以續玩
- *   - server URL 參數化：單機／設定完成但未連線／設定錯誤
  * 指定 SCREENSHOT_DIR 時才保存截圖；瀏覽器設定檔於測試結束後自動清除。
  */
 'use strict';
@@ -41,7 +38,6 @@ const VIEWPORTS = [
 ];
 
 const failures = [];
-const notes = [];
 function check(label, condition, detail) {
   if (condition) {
     console.log('  ✓ ' + label);
@@ -147,7 +143,7 @@ const PAGE_HELPERS = `
       }
       /* 設定鈕是固定定位的，必須確認它沒有壓到其他可操作的元素 */
       var covered = [];
-      var clickable = document.querySelectorAll('.screen.active button:not(#b-settings), .screen.active input, .screen.active .optcard, .settings-modal.open button, .room-info-modal.open button');
+      var clickable = document.querySelectorAll('.screen.active button:not(#b-settings), .screen.active input, .screen.active .optcard, .settings-modal.open button, .game-dialog-modal.open button');
       for (var k = 0; k < clickable.length; k++) {
         var cr = clickable[k].getBoundingClientRect();
         if (cr.width === 0 || cr.height === 0) continue;
@@ -184,8 +180,7 @@ const PAGE_HELPERS = `
         usage: Math.round((r.width / room) * 100),
         filled: b.querySelectorAll('.cell.given').length,
         toolMax: Math.max.apply(null, Array.prototype.map.call(document.querySelectorAll('#s-game .tools .btn3d'), function (el) { return el.getBoundingClientRect().height; })),
-        numMax: Math.max.apply(null, Array.prototype.map.call(document.querySelectorAll('#s-game .numkey'), function (el) { return el.getBoundingClientRect().height; })),
-        noteCorner: Math.max.apply(null, Array.prototype.map.call(b.querySelectorAll('.cell-note-corner'), function (el) { return Math.max(el.getBoundingClientRect().width, el.getBoundingClientRect().height); }))
+        numMax: Math.max.apply(null, Array.prototype.map.call(document.querySelectorAll('#s-game .numkey'), function (el) { return el.getBoundingClientRect().height; }))
       };
     },
     selection: function () {
@@ -425,13 +420,12 @@ async function main() {
         JSON.stringify(boardInfo));
     }
     const gameControls = JSON.parse(await cdp.eval(
-      "var pause=document.getElementById('b-pause'); var roomInfo=document.getElementById('b-room-info');" +
-      "return JSON.stringify({pauseInTimer:!!pause.closest('.stat-time'),roomInfoHidden:roomInfo.hidden," +
+      "var pause=document.getElementById('b-pause');" +
+      "return JSON.stringify({pauseInTimer:!!pause.closest('.stat-time')," +
       "pauseWidth:pause.getBoundingClientRect().width,pauseHeight:pause.getBoundingClientRect().height});"
     ));
     check('暫停按鈕放在計時器旁邊且維持觸控尺寸', gameControls.pauseInTimer && gameControls.pauseWidth >= 40 && gameControls.pauseHeight >= 40,
       JSON.stringify(gameControls));
-    check('單機遊戲不顯示房間資訊入口', gameControls.roomInfoHidden, JSON.stringify(gameControls));
     await cdp.eval(
       "var givens=Array.from(document.querySelectorAll('#board .cell.given'));" +
       "var selected=givens.find(function(cell){return cell.querySelector('.v').textContent==='4';}) || givens[0];" +
@@ -484,8 +478,6 @@ async function main() {
       check('手機／平板數字鍵維持緊湊但不超過 54px', boardInfo.numMax <= 54,
         '數字鍵最高 ' + boardInfo.numMax + 'px');
     }
-    check('格子留言三角形縮小避免誤按', boardInfo.noteCorner <= 12,
-      '三角形 ' + boardInfo.noteCorner + 'px');
     const fitted = JSON.parse(await cdp.eval(
       "var board=document.getElementById('board').getBoundingClientRect();" +
       "var pad=document.querySelector('#s-game .padwrap').getBoundingClientRect();" +
@@ -511,52 +503,6 @@ async function main() {
       ));
       check(lang + ' 剩餘／提示／填錯等寬對齊且容納三位數', counters.every((r) => r.fits &&
         Math.abs(r.width - counters[0].width) < 1 && Math.abs(r.top - counters[0].top) < 1), JSON.stringify(counters));
-    }
-    const noteChrome = JSON.parse(await cdp.eval(
-      "var corner=document.querySelector('#board .cell .cell-note-corner');" +
-      "if(corner) corner.click();" +
-      "var triangleOpen=!!corner && !corner.parentNode.querySelector('.cell-note-popover').hidden;" +
-      "var playerCell=document.querySelector('#board .cell[data-i=\"1\"]');" +
-      "if(playerCell) playerCell.click();" +
-      "var playerPopover=playerCell && playerCell.querySelector('.cell-note-popover');" +
-      "var cs=corner ? getComputedStyle(corner) : null;" +
-      "return JSON.stringify({corners:document.querySelectorAll('#board .cell .cell-note-corner').length," +
-      "size:cs ? Math.max(parseFloat(cs.width),parseFloat(cs.height)) : 0," +
-      "open:triangleOpen,playerClickOpens:!!playerPopover && !playerPopover.hidden});"
-    ));
-    check('玩家點整格不會展開格子留言', noteChrome.playerClickOpens === false, JSON.stringify(noteChrome));
-    check('每格都有右上角小型格子留言三角形且可展開', noteChrome.corners === 81 && noteChrome.size <= 18 && noteChrome.open, JSON.stringify(noteChrome));
-    await cdp.eval("document.querySelector('#board .cell').click(); return 1;");
-    if (v.mobile) {
-      await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
-      const point = JSON.parse(await cdp.eval(
-        "var r=document.querySelector('#board .cell .cell-note-corner').getBoundingClientRect();" +
-        "return JSON.stringify({x:r.left+r.width/2,y:r.top+r.height/2});"
-      ));
-      async function touchCorner(duration, move) {
-        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
-        if (move) {
-          await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: point.x + 20, y: point.y + 20 }] });
-        }
-        await sleep(duration);
-        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-        await sleep(120);
-        return JSON.parse(await cdp.eval(
-          "var cell=document.querySelector('#board .cell');" +
-          "return JSON.stringify({selected:cell.classList.contains('sel'),open:!cell.querySelector('.cell-note-popover').hidden});"
-        ));
-      }
-      const tap = await touchCorner(40, false);
-      check('觸控短按三角形只選格，不會誤開留言', tap.selected && !tap.open, JSON.stringify(tap));
-      const hold = await touchCorner(650, false);
-      check('觸控長按可查看留言，放開後不會被合成點擊關閉', hold.selected && hold.open, JSON.stringify(hold));
-      const dismiss = await touchCorner(40, false);
-      check('留言開啟後再短按同一格三角形即可收起', dismiss.selected && !dismiss.open, JSON.stringify(dismiss));
-      const repeatTap = await touchCorner(40, false);
-      check('收起後再次短按不會重新開啟留言', repeatTap.selected && !repeatTap.open, JSON.stringify(repeatTap));
-      const moved = await touchCorner(650, true);
-      check('觸控滑動取消長按留言', !moved.open, JSON.stringify(moved));
-      await cdp.eval("document.querySelector('#board .cell').click(); return 1;");
     }
     if (v.width === 390) {
       const seedBefore = await cdp.eval("return document.getElementById('g-seed').textContent;");
@@ -835,236 +781,9 @@ async function main() {
   const dailyUi = JSON.parse(await cdp.eval(
     "var saved=JSON.parse(localStorage.getItem('sudoku.game') || 'null');" +
     "return JSON.stringify({seed:document.getElementById('g-seed').textContent," +
-    "expected:RNG.dailySeed(),host:!document.getElementById('hostbar').hidden});"
+    "expected:RNG.dailySeed()});"
   ));
-  check('每日挑戰從主選單開啟當日單機題目', dailyReady && dailyUi.seed.indexOf(dailyUi.expected) >= 0 && !dailyUi.host, JSON.stringify(dailyUi));
-
-  /* ---------- server URL 參數化：單機／已連線／設定錯誤／連不上 ---------- */
-  console.log('\n【server URL 參數化】');
-  const readServerRow = "document.getElementById('b-settings').click();";
-  const dumpServerRow =
-    "var r=JSON.stringify({status:window.GameConfig.status,url:window.GameConfig.serverUrl," +
-    "source:window.GameConfig.source," +
-    "pill:document.getElementById('settings-server-state').textContent," +
-    "state:document.getElementById('settings-server-state').getAttribute('data-state')," +
-    "text:document.getElementById('settings-server-url').textContent});" +
-    "document.getElementById('settings-close').click(); return r;";
-
-  await goto(BASE);
-  await sleep(250);
-  await cdp.eval(readServerRow + ' return 1;');
-  await sleep(400);
-  const soloRaw = await cdp.eval(dumpServerRow);
-  const solo = JSON.parse(soloRaw);
-  check('沒設定時是單機模式，設定彈窗顯示「單機」',
-    solo.status === 'unset' && solo.url === null && solo.state === 'unset' && solo.pill === '單機', soloRaw);
-
-  await goto(BASE + '?server=' + encodeURIComponent('http://127.0.0.1:' + PORT));
-  await sleep(250);
-  await cdp.eval(
-    "window.__settingsFetches=[]; window.__settingsOriginalFetch=window.fetch;" +
-    "window.fetch=function(){window.__settingsFetches.push(String(arguments[0]));" +
-    "return window.__settingsOriginalFetch.apply(this,arguments);}; return 1;"
-  );
-  await cdp.eval(readServerRow + ' return 1;');
-  await sleep(1200);
-  const onlineRaw = await cdp.eval(dumpServerRow);
-  const online = JSON.parse(onlineRaw);
-  const settingsFetches = await cdp.eval('return JSON.stringify(window.__settingsFetches);');
-  check('?server= 有效時只顯示設定完成，打開設定不會喚醒伺服器',
-    online.status === 'ok' && online.source === 'query' && online.state === 'ready' && online.pill === '已設定' &&
-      JSON.parse(settingsFetches).length === 0, onlineRaw + ' requests=' + settingsFetches);
-
-  await goto(BASE + '?server=' + encodeURIComponent('沒有這種網址'));
-  await sleep(250);
-  await cdp.eval(readServerRow + ' return 1;');
-  await sleep(400);
-  const badRaw = await cdp.eval(dumpServerRow);
-  const bad = JSON.parse(badRaw);
-  check('server URL 格式錯誤時退回單機並標示「設定錯誤」',
-    bad.status === 'invalid' && bad.url === null && bad.state === 'invalid' && bad.pill === '設定錯誤', badRaw);
-
-  /* 指到一個沒人在聽的埠：打開設定頁不應探測該服務或產生網路錯誤。 */
-  await goto(BASE + '?server=' + encodeURIComponent('http://127.0.0.1:9'));
-  await sleep(250);
-  await cdp.eval(
-    "window.__settingsFetches=[]; window.__settingsOriginalFetch=window.fetch;" +
-    "window.fetch=function(){window.__settingsFetches.push(String(arguments[0]));" +
-    "return window.__settingsOriginalFetch.apply(this,arguments);}; return 1;"
-  );
-  await cdp.eval(readServerRow + ' return 1;');
-  await sleep(400);
-  const downRaw = await cdp.eval(dumpServerRow);
-  const down = JSON.parse(downRaw);
-  const deadServerFetches = await cdp.eval('return JSON.stringify(window.__settingsFetches);');
-  check('伺服器尚未回應時設定頁也不會探測，遊戲仍可單機使用',
-    down.status === 'ok' && down.state === 'ready' && down.pill === '已設定' && JSON.parse(deadServerFetches).length === 0,
-    downRaw + ' requests=' + deadServerFetches);
-
-  const playable = await cdp.eval(
-    "var s=Sudoku.generatePuzzle({difficulty:'easy',seed:'OFFLINE'});" +
-    "return JSON.stringify({given:s.puzzle.filter(function(v){return v>0;}).length,unique:Sudoku.countSolutions(s.puzzle,2).count});"
-  );
-  const pl = JSON.parse(playable);
-  check('連不上伺服器時照樣出得了題（單機不受影響）', pl.given > 0 && pl.unique === 1, playable);
-
-  /* ---------- 線上主持人 UI：開始新題目後直接開房並看得到自己的房號 ---------- */
-  await setViewport(VIEWPORTS[3]);
-  await goto(BASE + '?server=' + encodeURIComponent('http://127.0.0.1:' + PORT));
-  await sleep(250);
-  await cdp.eval("localStorage.clear(); return 1;");
-  await goto(BASE + '?server=' + encodeURIComponent('http://127.0.0.1:' + PORT));
-  await cdp.eval("document.getElementById('b-new').click(); return 1;");
-  const setupReady = await waitForPage("document.getElementById('s-setup').classList.contains('active')", 3000);
-  await cdp.eval("document.getElementById('b-start').click(); return 1;");
-  const hostReady = await waitForPage("document.getElementById('s-game').classList.contains('active') && !document.getElementById('hostbar').hidden && document.getElementById('h-code').textContent !== '開房中…'", 5000);
-  await cdp.eval("document.getElementById('b-room-info').click(); return 1;");
-  await sleep(220);
-  const hostUi = JSON.parse(await cdp.eval(
-    "var roomModal=document.getElementById('room-info-modal'); var roomTrigger=document.getElementById('b-room-info');" +
-    "var hostBar=document.getElementById('hostbar'); var hostBox=document.getElementById('host-codebox'); var hostCode=document.getElementById('h-code');" +
-    "var rect=hostCode.getBoundingClientRect(); var boxRect=hostBox.getBoundingClientRect();" +
-    "var copy=document.getElementById('b-copy-room-code'); var copyRect=copy.getBoundingClientRect();" +
-    "var closeRoom=document.getElementById('b-close-room'); var closeRect=closeRoom.getBoundingClientRect();" +
-    "return JSON.stringify({setup:" + String(setupReady) + ",game:" + String(hostReady) + ",roomOpen:roomModal.classList.contains('open')," +
-    "roomFocus:document.activeElement.id,roomTriggerHidden:roomTrigger.hidden,hostParent:hostBar.parentNode.id," +
-    "text:hostCode.textContent,display:getComputedStyle(hostCode).display,width:rect.width,height:rect.height," +
-    "boxDisplay:getComputedStyle(hostBox).display,boxWidth:boxRect.width,boxHeight:boxRect.height," +
-    "copyDisplay:getComputedStyle(copy).display,copyWidth:copyRect.width,copyHeight:copyRect.height," +
-    "closeDisplay:getComputedStyle(closeRoom).display,closeWidth:closeRect.width,closeHeight:closeRect.height});"
-  ));
-  check('開始新題目後會直接開房並在房間資訊看到清楚的房號', hostUi.setup && hostUi.game && hostUi.roomOpen && hostUi.roomFocus === 'room-info-panel' &&
-    !hostUi.roomTriggerHidden && hostUi.hostParent === 'room-info-body' && /^[A-Z0-9]{4}$/.test(hostUi.text) &&
-    hostUi.display !== 'none' && hostUi.width > 0 && hostUi.height > 0 && hostUi.boxDisplay !== 'none' &&
-    hostUi.boxWidth > 0 && hostUi.boxHeight > 0 && hostUi.copyDisplay !== 'none' && hostUi.copyWidth > 0 && hostUi.copyHeight > 0 &&
-    hostUi.closeDisplay !== 'none' && hostUi.closeWidth >= 40 && hostUi.closeHeight >= 40, JSON.stringify(hostUi));
-  await shot('房主房間資訊-667x375');
-  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
-  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
-  await sleep(180);
-  const roomClosed = JSON.parse(await cdp.eval(
-    "var m=document.getElementById('room-info-modal'); return JSON.stringify({open:m.classList.contains('open'),focus:document.activeElement.id});"
-  ));
-  check('房間資訊按 Escape 關閉並把焦點還給入口', !roomClosed.open && roomClosed.focus === 'b-room-info', JSON.stringify(roomClosed));
-  await setViewport(VIEWPORTS[1]);
-  await cdp.eval("document.getElementById('b-room-info').click(); return 1;");
-  await sleep(180);
-  const hostMobileUi = JSON.parse(await cdp.eval(
-    "var mobileModal=document.getElementById('room-info-modal'); var mobileTrigger=document.getElementById('b-room-info');" +
-    "var mobileBox=document.getElementById('host-codebox'); var mobileCode=document.getElementById('h-code');" +
-    "var mobileRect=mobileCode.getBoundingClientRect(); var mobileBoxRect=mobileBox.getBoundingClientRect();" +
-    "var triggerRect=mobileTrigger.getBoundingClientRect();" +
-    "return JSON.stringify({open:mobileModal.classList.contains('open'),text:mobileCode.textContent,boxWidth:mobileBoxRect.width,boxHeight:mobileBoxRect.height," +
-    "codeWidth:mobileRect.width,codeHeight:mobileRect.height,triggerWidth:triggerRect.width,triggerHeight:triggerRect.height,viewportWidth:window.innerWidth});"
-  ));
-  check('房主在 390×844 開啟房間資訊仍看得到房號', hostMobileUi.open && /^[A-Z0-9]{4}$/.test(hostMobileUi.text) && hostMobileUi.viewportWidth === 390 &&
-    hostMobileUi.triggerWidth >= 40 && hostMobileUi.triggerHeight >= 40 && hostMobileUi.boxWidth > 0 && hostMobileUi.boxHeight > 0 &&
-    hostMobileUi.codeWidth > 0 && hostMobileUi.codeHeight > 0, JSON.stringify(hostMobileUi));
-  await shot('房主房間資訊-390x844');
-  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
-  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
-  await sleep(120);
-
-  const desktopWide = { name: '桌機超寬短版', width: 1869, height: 815, mobile: false, dsf: 1 };
-  await setViewport(desktopWide);
-  await sleep(200);
-  const hostDesktopUi = JSON.parse(await cdp.eval(
-    "var gameBody=document.querySelector('#s-game .gamebody').getBoundingClientRect();" +
-    "var desktopBoard=document.querySelector('#s-game #board').getBoundingClientRect();" +
-    "var desktopPad=document.querySelector('#s-game .padwrap').getBoundingClientRect();" +
-    "return JSON.stringify({viewportWidth:window.innerWidth,bodyWidth:gameBody.width,boardWidth:desktopBoard.width," +
-    "boardLeft:desktopBoard.left,boardRight:desktopBoard.right,padLeft:desktopPad.left,padRight:desktopPad.right," +
-    "gap:desktopPad.left-desktopBoard.right});"
-  ));
-  check('桌機棋盤與輸入區不留大片空白', hostDesktopUi.viewportWidth === desktopWide.width && hostDesktopUi.gap <= 40,
-    JSON.stringify(hostDesktopUi));
-
-  await cdp.eval(
-    "var hintCount=0; while(document.getElementById('s-result').classList.contains('active')===false && hintCount<200){" +
-    "document.getElementById('b-hint').click(); hintCount++;} return hintCount;"
-  );
-  const hostResultReady = await waitForPage("document.getElementById('s-result').classList.contains('active')", 5000);
-  await cdp.eval("document.getElementById('b-again').click(); return 1;");
-  const sameRoomReady = await waitForPage(
-    "document.getElementById('s-game').classList.contains('active') && !document.getElementById('hostbar').hidden && " +
-    "document.getElementById('h-code').textContent === " + JSON.stringify(hostUi.text) + " && " +
-    "document.getElementById('h-conn').getAttribute('data-state') === 'open'", 5000
-  );
-  const sameRoomUi = JSON.parse(await cdp.eval(
-    "return JSON.stringify({result:" + String(hostResultReady) + ",same:" + String(sameRoomReady) + "," +
-    "code:document.getElementById('h-code').textContent,conn:document.getElementById('h-conn').getAttribute('data-state')});"
-  ));
-  check('再來一局會沿用原本房號與房間連線', sameRoomUi.result && sameRoomUi.same && sameRoomUi.code === hostUi.text && sameRoomUi.conn === 'open', JSON.stringify(sameRoomUi));
-  await cdp.eval("var close=document.getElementById('b-close-room'); if(!close.hidden) close.click(); return 1;");
-
-  /* ---------- 線上觀戰者 UI：只允許格子留言與聊天室 ---------- */
-  /* 在使用前才建立測試房間，避免完整三語巡檢超過主持人斷線寬限期。 */
-  const onlineRoomResponse = await fetch('http://127.0.0.1:' + PORT + '/api/rooms', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      hostName: '瀏覽器測試主持人', difficulty: 'easy', label: '簡單', seed: 'BROW',
-      snapshot: {
-        puzzle: '0'.repeat(81), values: '0'.repeat(81), notes: new Array(81).fill(0),
-        selected: -1, elapsedMs: 0, hintsUsed: 0, mistakes: 0, status: 'playing'
-      }
-    })
-  });
-  const onlineRoom = await onlineRoomResponse.json();
-  if (!onlineRoomResponse.ok || !onlineRoom.ok) throw new Error('無法建立瀏覽器線上觀戰測試房間');
-  await setViewport(VIEWPORTS[1]);
-  await goto(BASE + '?server=' + encodeURIComponent('http://127.0.0.1:' + PORT) +
-    '&room=' + encodeURIComponent(onlineRoom.code) + '&invite=' + encodeURIComponent(onlineRoom.inviteToken));
-  const inviteLobby = await waitForPage("document.getElementById('s-lobby').classList.contains('active') && !document.getElementById('lobby-invite').hidden", 5000);
-  check('邀請連結先停在大廳讓觀戰者設定暱稱', inviteLobby);
-  await cdp.eval("document.getElementById('lobby-nick').value='數獨觀眾'; document.getElementById('lobby-nick').dispatchEvent(new Event('input')); document.getElementById('b-lobby-invite').click(); return 1;");
-  const watchReady = await waitForPage("document.getElementById('s-watch').classList.contains('active') && document.querySelectorAll('#watch-board .cell').length === 81", 5000);
-  await waitForPage("document.getElementById('sum-conn').getAttribute('data-state') === 'open'", 5000);
-  const watchUi = JSON.parse(await cdp.eval(
-    "return JSON.stringify({ready:" + String(watchReady) + "," +
-    "corners:document.querySelectorAll('#watch-board .cell .cell-note-corner').length," +
-    "input:document.getElementById('watch-note-input').maxLength," +
-    "numpad:!!document.querySelector('#s-watch .numpad'),hint:!!document.querySelector('#s-watch #b-hint')," +
-    "cellTag:document.querySelector('#watch-board .cell').tagName});"
-  ));
-  check('觀戰者畫面每格都有格子留言三角形，且沒有數字盤／遊戲提示',
-    watchUi.ready && watchUi.corners === 81 && watchUi.input === 10 && !watchUi.numpad && !watchUi.hint && watchUi.cellTag === 'DIV', JSON.stringify(watchUi));
-  const chatLayout = JSON.parse(await cdp.eval(
-    "var chatFab=document.getElementById('b-chat'); chatFab.focus(); chatFab.click();" +
-    "var chatPanel=document.getElementById('chat-panel');" +
-    "return JSON.stringify({open:chatPanel.classList.contains('open'),fabDisplay:getComputedStyle(chatFab).display," +
-    "focus:document.activeElement.id});"
-  ));
-  check('聊天室展開時不會覆蓋輸入按鈕', chatLayout.open && chatLayout.fabDisplay === 'none' && chatLayout.focus === 'chat-close', JSON.stringify(chatLayout));
-  const chatClosedFocus = await cdp.eval("var chatClose=document.getElementById('chat-close'); chatClose.focus(); chatClose.click(); return document.activeElement.id;");
-  check('聊天室關閉後焦點回到聊天入口', chatClosedFocus === 'b-chat', chatClosedFocus);
-  const noteUi = JSON.parse(await cdp.eval(
-    "var c=document.querySelector('#watch-board .cell[data-i=\"80\"]'); c.click();" +
-    "var i=document.getElementById('watch-note-input'); i.value='可能是7';" +
-    "document.getElementById('watch-note-form').requestSubmit();" +
-    "return JSON.stringify({selected:c.classList.contains('watch-sel'),cell:c.getAttribute('data-i'),value:i.value," +
-    "open:!c.querySelector('.cell-note-popover').hidden});"
-  ));
-  const noteAppeared = await waitForPage("document.querySelector('#watch-board .cell[data-i=\"80\"]').classList.contains('has-shared-notes')", 5000);
-  await sleep(500);
-  await cdp.eval(
-    "var i=document.getElementById('watch-note-input'); i.value='再看一眼';" +
-    "document.getElementById('watch-note-form').requestSubmit(); return 1;"
-  );
-  const secondNoteAppeared = await waitForPage(
-    "document.querySelector('#watch-board .cell[data-i=\"80\"] .cell-note-count').textContent === '2'", 5000
-  );
-  const popover = JSON.parse(await cdp.eval(
-    "var c=document.querySelector('#watch-board .cell[data-i=\"80\"]'); c.click();" +
-    "c.querySelector('.cell-note-corner').click();" +
-    "var p=c.querySelector('.cell-note-popover');" +
-    "return JSON.stringify({open:!p.hidden,text:p.textContent});"
-  ));
-  check('觀戰者點格子會開啟格子留言', noteUi.selected && noteUi.cell === '80' && noteUi.open, JSON.stringify(noteUi));
-  check('觀戰者可以連續新增 10 字內格子留言', noteUi.selected && noteUi.cell === '80' && noteAppeared && secondNoteAppeared,
-    JSON.stringify({ ui: noteUi, appeared: noteAppeared, second: secondNoteAppeared }));
-  check('點右上角三角形會顯示格子留言歷史', popover.open && popover.text.indexOf('可能是7') >= 0 && popover.text.indexOf('再看一眼') >= 0,
-    JSON.stringify(popover));
+  check('每日挑戰從主選單開啟當日單機題目', dailyReady && dailyUi.seed.indexOf(dailyUi.expected) >= 0, JSON.stringify(dailyUi));
 
   /* ---------- 收尾 ---------- */
   await cdp.send('Browser.close').catch(() => {});
@@ -1072,7 +791,6 @@ async function main() {
   await sleep(300);
 
   if (SHOTS) console.log('\n螢幕截圖已存到：' + SHOTS);
-  if (notes.length) notes.forEach((n) => console.log('格子留言：' + n));
   if (failures.length) {
     console.log('\n共 ' + failures.length + ' 項未通過：');
     failures.forEach((f) => console.log('  - ' + f));

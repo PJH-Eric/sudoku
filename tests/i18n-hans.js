@@ -51,7 +51,7 @@ if (path.basename(root) === 'maze-roll') {
     assert.ok(typeof value === 'function' || (typeof value === 'string' && (value.length > 0 || hant[key] === '')), `簡中字典 ${key} 不可為空`);
     if (typeof value === 'string' && typeof hant[key] === 'string') assert.deepEqual(placeholders(value), placeholders(hant[key]), `${key} 的動態參數必須保留`);
     if (typeof value === 'function') {
-      const sample = { name: 'Player-XYZ', n: 3, a: 2, b: 4, moves: 5, time: '1:23', ms: 42, p: 1, hp: 3, near: 1, deep: 5, far: 2, speed: 1, every: 3, rate: 10, cap: 2, spike: 20, fake: 5, diff: '一般', players: 1, seats: 4, spectators: 0, w: 2, l: 1, m: 5, t: '2:00', tag: '完成', left: 2, s: 4, place: 1 };
+      const sample = { name: 'Player-XYZ', n: 3, a: 2, b: 4, moves: 5, time: '1:23', ms: 42, p: 1, hp: 3, near: 1, deep: 5, far: 2, speed: 1, every: 3, rate: 10, cap: 2, spike: 20, fake: 5, diff: '一般', players: 1, seats: 4, w: 2, l: 1, m: 5, t: '2:00', tag: '完成', left: 2, s: 4, place: 1 };
       assert.equal(typeof value(sample), 'string', `簡中動態翻譯 ${key} 必須回傳文字`);
       if (value.toString().includes('p.name')) assert.ok(value(sample).includes('Player-XYZ'), `${key} 必須保留玩家名稱`);
     }
@@ -100,6 +100,4 @@ if (path.basename(root) === 'draw-guess') {
   }
 }
 
-const analyticsFile = fs.existsSync(path.join(root, 'public/js/analytics.js')) ? 'public/js/analytics.js' : 'analytics.js';
-assert.match(read(analyticsFile), /lang === 'en' \|\| lang === 'zh-Hans'/, 'GA4 app_language 應保留簡體語系代碼');
 console.log(`${path.basename(root)} zh-Hans localization checks passed`);

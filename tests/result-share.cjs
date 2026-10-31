@@ -11,7 +11,7 @@ const { chromium } = require('playwright');
       contentType: 'text/html; charset=utf-8',
       body: '<html lang="zh-TW"><head><title>Fruit Link</title></head><body><section data-result-share><h2>勝利</h2><p>分數 123</p><button>再來一局</button></section><p>CHAT SECRET</p></body></html>'
     }));
-    await page.goto('https://games.test/island/fruit-link/?room=secret&token=credential#watch');
+    await page.goto('https://games.test/island/fruit-link/?campaign=secret&token=credential#section');
     const asset = path.join(__dirname, '../public/js/result-share.js');
     await page.addScriptTag({ path: path.join(path.dirname(asset), 'locales/result-share.js') });
     await page.route('https://games.test/island/fruit-link/vendor/html2canvas.min.js', route => route.fulfill({

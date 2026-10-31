@@ -104,7 +104,7 @@
     if (UNIT_KIND[unitIndex] === 'col') return T('unit.col', { n: no });
     return T('unit.box', { n: no });
   }
-  /* 技巧名稱在資料裡維持中文識別字（存檔、房間資訊都用它），顯示時才翻譯 */
+  /* 技巧名稱在資料裡維持中文識別字（存檔與提示共用），顯示時才翻譯 */
   var TECH_KEYS = {
     '唯一候選數': 'tech.single', '隱藏唯一數': 'tech.hidden', '區塊摒除': 'tech.locked',
     '裸對': 'tech.nakedPair', '裸三': 'tech.nakedTriple', '隱藏對': 'tech.hiddenPair',

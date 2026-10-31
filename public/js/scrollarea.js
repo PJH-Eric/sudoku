@@ -4,7 +4,7 @@
   var areas = new Map();
   var pending = false;
   var nextId = 0;
-  var selector = '.screen,.settings-body,.room-info-body,.chat-log,.cell-note-items,.summary,.padwrap';
+  var selector = '.screen,.settings-body,.game-dialog-body,.padwrap';
 
   function schedule() {
     if (pending) return;
@@ -65,7 +65,7 @@
     document.querySelectorAll(selector).forEach(function (area) {
       if (!areas.has(area)) attach(area);
     });
-    var modal = document.querySelector('.settings-modal.open,.room-info-modal.open');
+    var modal = document.querySelector('.settings-modal.open,.game-dialog-modal.open');
     areas.forEach(function (entry, area) {
       if (!area.isConnected) {
         observer.unobserve(area);

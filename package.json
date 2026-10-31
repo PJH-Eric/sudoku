@@ -1,17 +1,15 @@
 {
   "name": "sudoku",
   "version": "1.0.0",
-  "description": "數獨小學堂 - 可愛風 9x9 數獨小遊戲（單機、線上觀戰留言、五種難度、唯一解保證）",
+  "description": "數獨小學堂 - 9x9 單機數獨遊戲（五種難度、唯一解保證）",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/server-outage.cjs && node tests/analytics.js && node tests/localization.js && node tests/verify.js && node tests/i18n.js && node tests/i18n-hans.js",
+    "test": "node tests/localization.js && node tests/verify.js && node tests/i18n.js && node tests/i18n-hans.js",
     "test:browser": "node scripts/browser-check.js",
-    "test:online": "node scripts/online-check.js",
-    "verify": "node tests/verify.js && node tests/i18n.js && node scripts/browser-check.js && node scripts/online-check.js",
-    "test:localization": "node tests/localization.js",
-    "test:analytics": "node tests/analytics.js"
+    "verify": "node tests/verify.js && node tests/i18n.js && node scripts/browser-check.js",
+    "test:localization": "node tests/localization.js"
   },
   "engines": {
     "node": "^26.12.1"

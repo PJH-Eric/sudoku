@@ -7,7 +7,7 @@ const END = '<!--SEO:END-->';
 const esc = value => String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const safeJson = value => JSON.stringify(value).replace(/</g, '\\u003c');
 
-function validate(cfg, gaId) {
+function validate(cfg) {
   for (const key of ['id', 'siteUrl', 'title', 'description', 'lobbyUrl', 'genre', 'players']) {
     if (typeof cfg[key] !== 'string' || !cfg[key].trim()) throw new Error('seo.config.json 缺少欄位：' + key);
   }
@@ -16,15 +16,13 @@ function validate(cfg, gaId) {
   }
   if (cfg.lobbyUrl !== 'https://pjh-eric.github.io/game-lobby/') throw new Error('lobbyUrl 格式錯誤');
   if (cfg.title.length > 40 || cfg.description.length < 40 || cfg.description.length > 120) throw new Error('SEO 文案長度錯誤');
-  if (!/^G-[A-Z0-9]+$/.test(gaId)) throw new Error('GA_MEASUREMENT_ID 格式錯誤');
   if (cfg.ogImage && !/^https:\/\//.test(cfg.ogImage)) throw new Error('ogImage 必須是 HTTPS 網址');
   if (cfg.ogImage && !/\/assets\/images\/(?:cover|seo)\.webp$/.test(cfg.ogImage)) throw new Error('ogImage 必須指向 WebP 遊戲封面或 SEO 分享圖');
 }
 
-function inject(root, env = process.env) {
+function inject(root) {
   const cfg = JSON.parse(fs.readFileSync(path.join(root, 'seo.config.json'), 'utf8'));
-  const gaId = env.GA_MEASUREMENT_ID || 'G-PG79WZK8QY';
-  validate(cfg, gaId);
+  validate(cfg);
   const indexPath = path.join(root, 'public', 'index.html');
   let html = fs.readFileSync(indexPath, 'utf8');
   if (html.split(MARK).length !== 2) throw new Error('index.html 必須有一個 ' + MARK);
@@ -46,10 +44,6 @@ function inject(root, env = process.env) {
   };
   const head = [
     MARK,
-    // 共用 analytics.js 負責正式環境限制、URL 清理與單次初始化。
-    '<script>window.GAME_ANALYTICS_CONFIG=' + safeJson({
-      measurement_id: gaId, game_id: cfg.id, page_location: cfg.siteUrl
-    }) + ';</script>',
     cfg.googleSiteVerification && '<meta name="google-site-verification" content="' + esc(cfg.googleSiteVerification) + '">',
     '<meta name="description" data-i18n-content="' + esc(descriptionKey ? descriptionKey[1] : 'meta.desc') + '" content="' + esc(cfg.description) + '">',
     '<link rel="canonical" href="' + esc(cfg.siteUrl) + '">',
@@ -81,6 +75,6 @@ function inject(root, env = process.env) {
 
 module.exports = { inject, validate };
 if (require.main === module) {
-  try { console.log('✓ SEO 與 GA4 已注入：' + inject(path.join(__dirname, '..')).id); }
+  try { console.log('✓ SEO metadata 已注入：' + inject(path.join(__dirname, '..')).id); }
   catch (error) { console.error(error.message); process.exitCode = 1; }
 }
