@@ -184,9 +184,7 @@
     var conflicts = S.findConflicts(state.values);
     var wrong = options.markMistakes ? G.wrongCells(state) : null;
     var selValue = selected >= 0 ? state.values[selected] : 0;
-    var selRow = selected >= 0 ? S.ROW_OF[selected] : -1;
-    var selCol = selected >= 0 ? S.COL_OF[selected] : -1;
-    var selBox = selected >= 0 ? S.BOX_OF[selected] : -1;
+    var selPeers = selected >= 0 ? S.PEERS[selected] : [];
 
     for (var i = 0; i < 81; i++) {
       var el = cells[i];
@@ -196,8 +194,8 @@
       if (S.ROW_OF[i] === 2 || S.ROW_OF[i] === 5) cls += ' bb';
       if (state.given[i]) cls += ' given';
       if (i === selected) cls += ' sel';
-      else if (options.highlightUnits && selected >= 0 &&
-        (S.ROW_OF[i] === selRow || S.COL_OF[i] === selCol || S.BOX_OF[i] === selBox)) cls += ' peer';
+      else if (options.highlightUnits && selected >= 0 && selPeers.indexOf(i) >= 0) cls += ' peer';
+      if (S.DIAG_OF[i]) cls += ' diag';
       if (options.highlightSame && selValue && v === selValue) cls += ' same';
       if (conflicts[i]) cls += ' conflict';
       if (wrong && wrong[i]) cls += ' wrong';

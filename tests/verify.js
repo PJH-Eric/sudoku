@@ -115,9 +115,23 @@ section('2. 盤面規則與解題');
 const parse = (str) => str.split('').map((ch) => (ch === '.' || ch === '0' ? 0 : Number(ch)));
 
 ok('列、行、宮與同儕格的幾何正確', () => {
-  assert.strictEqual(S.UNITS.length, 27);
+  assert.strictEqual(S.UNITS.length, 29, '9 列 + 9 行 + 9 宮 + 2 條主對角線');
   S.UNITS.forEach((unit) => assert.strictEqual(unit.length, 9));
-  for (let i = 0; i < 81; i++) assert.strictEqual(S.PEERS[i].length, 20, `第 ${i} 格應該有 20 個同儕格`);
+  for (let i = 0; i < 81; i++) {
+    if (!S.DIAG_OF[i]) assert.strictEqual(S.PEERS[i].length, 20, `第 ${i} 格應該有 20 個同儕格`);
+    else assert.ok(S.PEERS[i].length > 20, `對角線上的第 ${i} 格同儕格應多於 20 個`);
+  }
+  const d1 = [], d2 = [];
+  for (let i = 0; i < 9; i++) { d1.push(i * 10); d2.push(i * 8 + 8); }
+  assert.deepStrictEqual(Array.from(S.UNITS[27]), d1, '左上到右下的主對角線');
+  assert.deepStrictEqual(Array.from(S.UNITS[28]), d2, '右上到左下的主對角線');
+  /* 主對角線規則：同一條對角線上不能有重複數字 */
+  const g = S.emptyGrid();
+  g[0] = 5;
+  assert.strictEqual(S.isLegal(g, 40, 5), false, '同一條對角線不能重複');
+  assert.strictEqual(S.isLegal(g, 16, 5), true, '另一條對角線不受影響');
+  assert.strictEqual(S.isLegal(g, 14, 5), true, '不在對角線上的格子不受影響');
+  assert.strictEqual(S.findConflicts(Object.assign(S.emptyGrid(), { 0: 3, 80: 3 }))[0], 1, '對角線兩端相同要標成衝突');
   assert.strictEqual(S.BOX_OF[0], 0);
   assert.strictEqual(S.BOX_OF[80], 8);
   assert.strictEqual(S.BOX_OF[30], 4);
@@ -129,7 +143,7 @@ ok('合法性與衝突偵測', () => {
   assert.strictEqual(S.isLegal(grid, 1, 5), false, '同一列不能有兩個 5');
   assert.strictEqual(S.isLegal(grid, 9, 5), false, '同一行不能有兩個 5');
   assert.strictEqual(S.isLegal(grid, 10, 5), false, '同一宮不能有兩個 5');
-  assert.strictEqual(S.isLegal(grid, 40, 5), true, "不同列行宮就可以填同一個數字");
+  assert.strictEqual(S.isLegal(grid, 14, 5), true, "不同列行宮且不在同一對角線就可以填同一個數字");
   grid[1] = 5;
   const flags = S.findConflicts(grid);
   assert.strictEqual(flags[0], 1);
@@ -147,14 +161,14 @@ ok('候選數計算正確', () => {
 
 ok('空盤有多組解、已知題目只有一組解', () => {
   assert.strictEqual(S.countSolutions(S.emptyGrid(), 3).count, 3, '空盤應該找得到多組解');
-  const classic = parse('530070000600195000098000060800060003400803001700020006060000280000419005000080079');
+  const classic = parse('5.96.1.2.4.7985..36..247.5......2.711.25.36.976.1......1.726..52..3148.7.7.8.92.6');
   assert.strictEqual(S.countSolutions(classic, 2).count, 1);
   const solved = S.solve(classic);
   assert.ok(S.isSolved(solved), '解出來的盤面必須完全合法');
 });
 
 ok('少一格提示就會變成多解', () => {
-  const classic = parse('530070000600195000098000060800060003400803001700020006060000280000419005000080079');
+  const classic = parse('5.96.1.2.4.7985..36..247.5......2.711.25.36.976.1......1.726..52..3148.7.7.8.92.6');
   const broken = classic.slice();
   broken[0] = 0; broken[1] = 0;
   assert.ok(S.countSolutions(broken, 3).count >= 1);
@@ -164,11 +178,11 @@ ok('少一格提示就會變成多解', () => {
 });
 
 ok('分級器能區分簡單題與需要試誤的題目', () => {
-  const classic = parse('530070000600195000098000060800060003400803001700020006060000280000419005000080079');
+  const classic = parse('5.96.1.2.4.7985..36..247.5......2.711.25.36.976.1......1.726..52..3148.7.7.8.92.6');
   assert.strictEqual(S.grade(classic), S.TIER.SINGLE, '這題只要唯一候選數就能解完');
-  const hardest = parse('8..........36......7..9.2...5...7.......457.....1...3...1....68..85...1..9....4..');
+  const hardest = parse('2...8....357..628........17...6...3..........52...............3..24.........3.7..');
   assert.strictEqual(S.countSolutions(hardest, 2).count, 1, '這題仍然是唯一解');
-  assert.strictEqual(S.grade(hardest), S.TIER.GUESS, '公認最難的題目應該被判定成需要試誤');
+  assert.strictEqual(S.grade(hardest), S.TIER.GUESS, '唯一解但邏輯技巧推不完的題目應該被判定成需要試誤');
   assert.strictEqual(S.humanSolve(hardest, S.TIER.ADVANCED).solved, false);
 });
 

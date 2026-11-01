@@ -35,11 +35,12 @@
   var ROW_OF = new Uint8Array(CELLS);
   var COL_OF = new Uint8Array(CELLS);
   var BOX_OF = new Uint8Array(CELLS);
-  var UNITS = [];                 // 27 個單元（9 列 + 9 行 + 9 宮），每個是 9 個索引
-  var UNIT_KIND = [];             // 'row' | 'col' | 'box'
+  var UNITS = [];                 // 29 個單元（9 列 + 9 行 + 9 宮 + 2 條主對角線），每個是 9 個索引
+  var UNIT_KIND = [];             // 'row' | 'col' | 'box' | 'diag'
   var UNIT_NO = [];               // 該類型中的第幾個（0 起算）
   var UNITS_OF = [];              // 每格所屬的 3 個單元編號
-  var PEERS = [];                 // 每格的 20 個同儕格
+  var PEERS = [];                 // 每格的同儕格（一般 20 個；在主對角線上的格子更多）
+  var DIAG_OF = new Uint8Array(CELLS);   // 位元遮罩：1 = 在左上到右下主對角線，2 = 在右上到左下主對角線
 
   (function build() {
     var i, r, c;
@@ -67,6 +68,15 @@
       }
       UNITS.push(box); UNIT_KIND.push('box'); UNIT_NO.push(b);
     }
+    /* 主對角線：左上到右下、右上到左下，各 9 格，數字 1..9 也必須不重複 */
+    var d1 = [], d2 = [];
+    for (i = 0; i < SIZE; i++) {
+      d1.push(i * SIZE + i);
+      d2.push(i * SIZE + (SIZE - 1 - i));
+    }
+    UNITS.push(d1); UNIT_KIND.push('diag'); UNIT_NO.push(0);
+    UNITS.push(d2); UNIT_KIND.push('diag'); UNIT_NO.push(1);
+    for (i = 0; i < SIZE; i++) { DIAG_OF[d1[i]] |= 1; DIAG_OF[d2[i]] |= 2; }
     for (i = 0; i < CELLS; i++) { UNITS_OF.push([]); PEERS.push([]); }
     for (var u = 0; u < UNITS.length; u++) {
       for (var k = 0; k < UNITS[u].length; k++) UNITS_OF[UNITS[u][k]].push(u);
@@ -102,6 +112,7 @@
     var no = UNIT_NO[unitIndex] + 1;
     if (UNIT_KIND[unitIndex] === 'row') return T('unit.row', { n: no });
     if (UNIT_KIND[unitIndex] === 'col') return T('unit.col', { n: no });
+    if (UNIT_KIND[unitIndex] === 'diag') return no === 1 ? T('unit.diag1') : T('unit.diag2');
     return T('unit.box', { n: no });
   }
   /* 技巧名稱在資料裡維持中文識別字（存檔與提示共用），顯示時才翻譯 */
@@ -944,7 +955,7 @@
 
   w.Sudoku = {
     SIZE: SIZE, CELLS: CELLS, FULL_MASK: FULL, BIT: BIT,
-    ROW_OF: ROW_OF, COL_OF: COL_OF, BOX_OF: BOX_OF,
+    ROW_OF: ROW_OF, COL_OF: COL_OF, BOX_OF: BOX_OF, DIAG_OF: DIAG_OF,
     UNITS: UNITS, PEERS: PEERS,
     TIER: TIER, TIER_NAMES: TIER_NAMES, TIER_HINTS: TIER_HINTS,
     DIFFICULTIES: DIFFICULTIES, PRESETS: PRESETS,
