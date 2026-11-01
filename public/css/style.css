@@ -338,8 +338,6 @@ body{
 .cell .v{font-size:calc(var(--bs,320px) / 9 * .62);font-weight:800;line-height:1;pointer-events:none}
 .cell.given{background:#F3EEFA;color:var(--ink)}
 .cell.given .v{font-weight:900}
-.cell.diag:not(.peer):not(.same):not(.conflict):not(.wrong):not(.sel){background:#FFF3D6}
-.cell.given.diag:not(.peer):not(.same):not(.conflict):not(.wrong):not(.sel){background:#F4E7C6}
 .cell.peer{background:#E3D6F5}
 .cell.same{background:var(--mint)}
 .cell.conflict{background:var(--danger-bg);color:var(--danger)}
