@@ -29,7 +29,7 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: 驗證並注入 SEO metadata
+      - name: 驗證並注入 GA4 與 SEO
         run: node tests/seo.js && node scripts/inject-seo.js
 
       - name: Upload public/ as artifact

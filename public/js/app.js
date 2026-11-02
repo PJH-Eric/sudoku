@@ -461,6 +461,7 @@
   }
 
   function beginGame(isNew) {
+    if (isNew) w.GameAnalytics.start({ mode: "solo", difficulty: state.difficulty, players: 1 });
     paused = false;
     q('pause-overlay').classList.remove('on');
     q('pause-overlay').setAttribute('aria-hidden', 'true');
@@ -519,6 +520,7 @@
 
   /* ---------- 結算 ---------- */
   function finishGame() {
+    w.GameAnalytics.end({ result: "win" });
     stopTimer();
     w.Store.clearGame();
     w.Sound.play('win');

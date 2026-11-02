@@ -6,9 +6,10 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/localization.js && node tests/verify.js && node tests/i18n.js && node tests/i18n-hans.js",
+    "test": "node tests/analytics.js && node tests/seo.js && node tests/localization.js && node tests/verify.js && node tests/i18n.js && node tests/i18n-hans.js",
     "test:browser": "node scripts/browser-check.js",
     "verify": "node tests/verify.js && node tests/i18n.js && node scripts/browser-check.js",
+    "test:analytics": "node tests/analytics.js",
     "test:localization": "node tests/localization.js"
   },
   "engines": {
